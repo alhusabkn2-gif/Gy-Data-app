@@ -1,15 +1,19 @@
-console.log(import.meta.env);import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY || '';
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL ||
+  "https://YOUR_PROJECT.supabase.co";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase environment variables are missing. Check .env file.');
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  "sb_publishable_YOUR_PUBLISHABLE_KEY";
+
+if (!supabaseUrl) {
+  throw new Error("supabaseUrl is required.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+if (!supabaseAnonKey) {
+  throw new Error("supabaseKey is required.");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
