@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 
 const monnifyController = require('../controllers/monnifyController');
-const rawBody = require('../middlewares/rawBody');
 
 /**
  * Monnify Routes
@@ -47,10 +46,9 @@ router.get(
 );
 
 // Webhook
-// rawBody must run before JSON parsing for this route.
+// The server captures req.rawBody via express.json({ verify }), so no route-level rawBody middleware is needed.
 router.post(
   '/webhook',
-  rawBody,
   monnifyController.handleWebhook
 );
 
