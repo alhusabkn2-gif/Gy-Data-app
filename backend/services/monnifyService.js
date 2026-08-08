@@ -11,14 +11,16 @@ class MonnifyService {
     this.secretKey = process.env.MONNIFY_SECRET_KEY;
     this.contractCode = process.env.MONNIFY_CONTRACT_CODE;
 
-    if (!this.apiKey || !this.secretKey || !this.contractCode) {
-      throw new Error(
-        'Monnify credentials are not properly configured in environment variables'
-      );
-    }
+    // Do not throw during construction — allow the server to start even when
+    // Monnify credentials are not provided. Use isConfigured() to check at
+    // runtime when an actual Monnify operation is requested.
 
     this.accessToken = null;
     this.tokenExpiry = 0;
+  }
+
+  isConfigured() {
+    return !!(this.apiKey && this.secretKey && this.contractCode);
   }
 
   getBasicAuth() {
@@ -28,6 +30,12 @@ class MonnifyService {
   }
 
   async getAccessToken() {
+    if (!this.isConfigured()) {
+      throw new Error(
+        'Monnify is not configured. Missing MONNIFY_API_KEY, MONNIFY_SECRET_KEY, or MONNIFY_CONTRACT_CODE environment variables.'
+      );
+    }
+
     if (
       this.accessToken &&
       this.tokenExpiry &&
