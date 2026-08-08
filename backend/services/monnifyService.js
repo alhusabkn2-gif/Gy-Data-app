@@ -39,7 +39,7 @@ class MonnifyService {
     try {
       const response = await axios.post(
         `${this.baseURL}/api/v1/auth/login`,
-        null,
+        {},
         {
           headers: {
             Authorization: `Basic ${this.getBasicAuth()}`,
@@ -60,11 +60,14 @@ class MonnifyService {
         );
       }
 
-      const { accessToken, expiresIn = 3600 } = body.responseBody;
+      const {
+        accessToken,
+        expiresIn = 3600
+      } = body.responseBody;
 
       this.accessToken = accessToken;
 
-      // Refresh 5 minutes before expiry.
+      // Refresh token 5 minutes before expiry.
       this.tokenExpiry =
         Date.now() + Math.max(expiresIn - 300, 60) * 1000;
 
@@ -78,7 +81,9 @@ class MonnifyService {
         error.message ||
         'Authentication failed';
 
-      throw new Error(`Failed to authenticate with Monnify: ${message}`);
+      throw new Error(
+        `Failed to authenticate with Monnify: ${message}`
+      );
     }
   }
 
@@ -101,6 +106,7 @@ class MonnifyService {
     } catch (error) {
       const status = error.response?.status;
 
+      // Refresh token once if Monnify rejects the cached token.
       if (retry && (status === 401 || status === 403)) {
         this.accessToken = null;
         this.tokenExpiry = 0;
@@ -114,6 +120,7 @@ class MonnifyService {
         'Monnify request failed';
 
       const wrapped = new Error(message);
+
       wrapped.statusCode = status || 500;
       wrapped.monnifyResponse = error.response?.data;
 
@@ -126,7 +133,8 @@ class MonnifyService {
 
     if (!body?.requestSuccessful) {
       throw new Error(
-        body?.responseMessage || 'Monnify request was unsuccessful'
+        body?.responseMessage ||
+        'Monnify request was unsuccessful'
       );
     }
 
@@ -138,20 +146,35 @@ class MonnifyService {
     };
   }
 
+  /**
+   * Create a Monnify reserved / virtual account.
+   *
+   * Monnify requires customer BVN or NIN for reserved accounts.
+   */
   async createReservedAccount(accountData) {
     const {
       accountReference,
       accountName,
-      customerEmail,
+
+      // Support both names so the controller can send either one.
       customerBvn,
       customerNin,
+      bvn,
+      nin,
+
+      customerEmail,
+
       currencyCode = 'NGN',
       getAllAvailableBanks = false,
       preferredBanks,
       incomeSplitConfig,
       restrictPaymentSource,
-      allowedPaymentSources
+      allowedPaymentSources,
+      allocationPercentage
     } = accountData;
+
+    const resolvedBvn = customerBvn || bvn;
+    const resolvedNin = customerNin || nin;
 
     if (!accountReference || !accountName) {
       throw new Error(
@@ -159,7 +182,7 @@ class MonnifyService {
       );
     }
 
-    if (!customerBvn && !customerNin) {
+    if (!resolvedBvn && !resolvedNin) {
       throw new Error(
         'customerBvn or customerNin is required for a reserved account'
       );
@@ -168,20 +191,36 @@ class MonnifyService {
     const payload = {
       accountReference,
       accountName,
-      customerEmail,
-      customerBvn,
-      customerNin,
       currencyCode,
       contractCode: this.contractCode,
       getAllAvailableBanks
     };
 
-    if (Array.isArray(preferredBanks) && preferredBanks.length) {
+    if (customerEmail) {
+      payload.customerEmail = customerEmail;
+    }
+
+    if (resolvedBvn) {
+      payload.customerBvn = resolvedBvn;
+    }
+
+    if (resolvedNin) {
+      payload.customerNin = resolvedNin;
+    }
+
+    if (
+      Array.isArray(preferredBanks) &&
+      preferredBanks.length > 0
+    ) {
       payload.preferredBanks = preferredBanks;
     }
 
     if (Array.isArray(incomeSplitConfig)) {
       payload.incomeSplitConfig = incomeSplitConfig;
+    }
+
+    if (allocationPercentage !== undefined) {
+      payload.allocationPercentage = allocationPercentage;
     }
 
     if (restrictPaymentSource !== undefined) {
@@ -217,7 +256,11 @@ class MonnifyService {
   }
 
   async listReservedAccounts(page = 0, pageSize = 10) {
-    const safePage = Number.isInteger(page) && page >= 0 ? page : 0;
+    const safePage =
+      Number.isInteger(page) && page >= 0
+        ? page
+        : 0;
+
     const safePageSize =
       Number.isInteger(pageSize) &&
       pageSize > 0 &&
@@ -250,10 +293,13 @@ class MonnifyService {
     });
 
     return {
-      success: response.data?.requestSuccessful ?? true,
+      success:
+        response.data?.requestSuccessful ?? true,
+
       message:
         response.data?.responseMessage ||
         'Account deallocated successfully',
+
       data: response.data?.responseBody
     };
   }
@@ -283,8 +329,13 @@ class MonnifyService {
       );
     }
 
-    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
-      throw new Error('amount must be a positive number');
+    if (
+      !Number.isFinite(Number(amount)) ||
+      Number(amount) <= 0
+    ) {
+      throw new Error(
+        'amount must be a positive number'
+      );
     }
 
     const payload = {
@@ -301,7 +352,10 @@ class MonnifyService {
       payload.redirectUrl = redirectUrl;
     }
 
-    if (Array.isArray(paymentMethods) && paymentMethods.length) {
+    if (
+      Array.isArray(paymentMethods) &&
+      paymentMethods.length > 0
+    ) {
       payload.paymentMethods = paymentMethods;
     }
 
@@ -320,7 +374,9 @@ class MonnifyService {
 
   async verifyPayment(transactionReference) {
     if (!transactionReference) {
-      throw new Error('transactionReference is required');
+      throw new Error(
+        'transactionReference is required'
+      );
     }
 
     const response = await this.request({
@@ -331,12 +387,20 @@ class MonnifyService {
       }
     });
 
-    return this.normalizeResponse(response);
+    const result = this.normalizeResponse(response);
+
+    return {
+      ...result,
+      isPaid:
+        result.data?.paymentStatus === 'PAID'
+    };
   }
 
   async getTransactionStatus(paymentReference) {
     if (!paymentReference) {
-      throw new Error('paymentReference is required');
+      throw new Error(
+        'paymentReference is required'
+      );
     }
 
     const response = await this.request({
@@ -352,17 +416,43 @@ class MonnifyService {
 
     return {
       ...result,
-      paymentReference: transaction.paymentReference,
-      transactionReference: transaction.transactionReference,
-      amount: transaction.amountPaid,
-      amountPaid: transaction.amountPaid,
-      totalPayable: transaction.totalPayable,
-      status: transaction.paymentStatus,
-      isPaid: transaction.paymentStatus === 'PAID',
-      paidAt: transaction.paidOn
+
+      paymentReference:
+        transaction.paymentReference,
+
+      transactionReference:
+        transaction.transactionReference,
+
+      amount:
+        transaction.amountPaid,
+
+      amountPaid:
+        transaction.amountPaid,
+
+      totalPayable:
+        transaction.totalPayable,
+
+      status:
+        transaction.paymentStatus,
+
+      isPaid:
+        transaction.paymentStatus === 'PAID',
+
+      paidAt:
+        transaction.paidOn
     };
   }
 
+  /**
+   * Validate Monnify webhook signature.
+   *
+   * Monnify uses HMAC-SHA512:
+   *
+   * HMAC-SHA512(clientSecret, rawRequestBody)
+   *
+   * The official header is:
+   * monnify-signature
+   */
   validateWebhookSignature(payload, signature) {
     if (!signature || !this.secretKey) {
       return false;
@@ -371,45 +461,59 @@ class MonnifyService {
     try {
       const bodyBuffer = Buffer.isBuffer(payload)
         ? payload
-        : Buffer.from(payload);
+        : Buffer.from(String(payload));
 
-      // Monnify documents SHA-512(clientSecret + requestBody).
-      const expected = crypto
-        .createHash('sha512')
-        .update(this.secretKey)
+      const expectedBuffer = crypto
+        .createHmac('sha512', this.secretKey)
         .update(bodyBuffer)
-        .digest('hex');
+        .digest();
 
       const received = String(signature)
         .trim()
         .replace(/^sha512=/i, '')
-        .trim()
-        .toLowerCase();
+        .trim();
 
-      if (!/^[a-f0-9]{128}$/.test(received)) {
+      // Monnify sends the signature as lowercase hex.
+      if (!/^[a-fA-F0-9]{128}$/.test(received)) {
         return false;
       }
 
-      const expectedBuffer = Buffer.from(expected, 'hex');
-      const receivedBuffer = Buffer.from(received, 'hex');
+      const receivedBuffer = Buffer.from(
+        received,
+        'hex'
+      );
 
-      return (
-        expectedBuffer.length === receivedBuffer.length &&
-        crypto.timingSafeEqual(
-          expectedBuffer,
-          receivedBuffer
-        )
+      if (
+        expectedBuffer.length !==
+        receivedBuffer.length
+      ) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(
+        expectedBuffer,
+        receivedBuffer
       );
     } catch (error) {
+      console.error(
+        'Webhook signature validation error:',
+        error.message
+      );
+
       return false;
     }
   }
 
   async processWebhookNotification(webhookData) {
-    const { eventType, eventData } = webhookData || {};
+    const {
+      eventType,
+      eventData
+    } = webhookData || {};
 
     if (!eventType || !eventData) {
-      throw new Error('Invalid webhook data structure');
+      throw new Error(
+        'Invalid webhook data structure'
+      );
     }
 
     switch (eventType) {
@@ -417,43 +521,94 @@ class MonnifyService {
         return {
           eventType,
           status: 'success',
+
           transactionReference:
             eventData.transactionReference,
-          paymentReference: eventData.paymentReference,
-          amountPaid: eventData.amountPaid,
-          totalPayable: eventData.totalPayable,
-          paymentStatus: eventData.paymentStatus,
-          paymentMethod: eventData.paymentMethod,
-          currency: eventData.currency,
-          paidOn: eventData.paidOn,
-          customer: eventData.customer,
-          product: eventData.product
+
+          paymentReference:
+            eventData.paymentReference,
+
+          amountPaid:
+            eventData.amountPaid,
+
+          totalPayable:
+            eventData.totalPayable,
+
+          paymentStatus:
+            eventData.paymentStatus,
+
+          paymentMethod:
+            eventData.paymentMethod,
+
+          currency:
+            eventData.currency ||
+            eventData.currencyCode,
+
+          paidOn:
+            eventData.paidOn,
+
+          customer:
+            eventData.customer,
+
+          product:
+            eventData.product
         };
 
       case 'FAILED_TRANSACTION':
         return {
           eventType,
           status: 'failed',
+
           transactionReference:
             eventData.transactionReference,
-          paymentReference: eventData.paymentReference,
-          amountPaid: eventData.amountPaid,
-          paymentStatus: eventData.paymentStatus
+
+          paymentReference:
+            eventData.paymentReference,
+
+          amountPaid:
+            eventData.amountPaid,
+
+          totalPayable:
+            eventData.totalPayable,
+
+          paymentStatus:
+            eventData.paymentStatus
         };
 
       case 'SUCCESSFUL_REFUND':
+        return {
+          eventType,
+          status: 'refunded',
+
+          transactionReference:
+            eventData.transactionReference,
+
+          refundReference:
+            eventData.refundReference,
+
+          refundAmount:
+            eventData.refundAmount,
+
+          refundStatus:
+            eventData.refundStatus
+        };
+
       case 'FAILED_REFUND':
         return {
           eventType,
-          status:
-            eventType === 'SUCCESSFUL_REFUND'
-              ? 'refunded'
-              : 'refund_failed',
+          status: 'refund_failed',
+
           transactionReference:
             eventData.transactionReference,
-          refundReference: eventData.refundReference,
-          refundAmount: eventData.refundAmount,
-          refundStatus: eventData.refundStatus
+
+          refundReference:
+            eventData.refundReference,
+
+          refundAmount:
+            eventData.refundAmount,
+
+          refundStatus:
+            eventData.refundStatus
         };
 
       default:
@@ -474,6 +629,7 @@ class MonnifyService {
         'Monnify API status check failed:',
         error.message
       );
+
       return false;
     }
   }
