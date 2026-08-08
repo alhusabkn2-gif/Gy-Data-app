@@ -1,9 +1,7 @@
 const monnifyService = require('../services/monnifyService');
 
 /**
- * @desc    Check Monnify service connection status
- * @route   GET /api/monnify/status
- * @access  Public
+ * Check Monnify service connection status
  */
 exports.getMonnifyStatus = async (req, res, next) => {
   try {
@@ -23,18 +21,6 @@ exports.getMonnifyStatus = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Create a reserved account (virtual account)
- * @route   POST /api/monnify/reserved-account
- * @access  Private
- * @body    {
- *   "accountReference": "unique-ref-12345",
- *   "accountName": "John Doe Account",
- *   "currencyCode": "NGN" (optional),
- *   "incomeSplitConfig": [] (optional),
- *   "allocationPercentage": null (optional)
- * }
- */
 exports.createReservedAccount = async (req, res, next) => {
   try {
     const {
@@ -42,10 +28,13 @@ exports.createReservedAccount = async (req, res, next) => {
       accountName,
       currencyCode,
       incomeSplitConfig,
-      allocationPercentage
+      allocationPercentage,
+      customerEmail,
+      customerName,
+      bvn,
+      customerPhoneNumber
     } = req.body;
 
-    // Validate required fields
     if (!accountReference || !accountName) {
       return res.status(400).json({
         success: false,
@@ -57,7 +46,6 @@ exports.createReservedAccount = async (req, res, next) => {
       });
     }
 
-    // Validate accountReference format (alphanumeric with dashes/underscores)
     if (!/^[a-zA-Z0-9_-]+$/.test(accountReference)) {
       return res.status(400).json({
         success: false,
@@ -68,9 +56,13 @@ exports.createReservedAccount = async (req, res, next) => {
     const accountData = {
       accountReference,
       accountName,
-      ...(currencyCode && { currencyCode }),
-      ...(incomeSplitConfig && { incomeSplitConfig }),
-      ...(allocationPercentage !== undefined && { allocationPercentage })
+      currencyCode,
+      incomeSplitConfig,
+      allocationPercentage,
+      customerEmail,
+      customerName,
+      bvn,
+      customerPhoneNumber
     };
 
     const result = await monnifyService.createReservedAccount(accountData);
@@ -84,17 +76,12 @@ exports.createReservedAccount = async (req, res, next) => {
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to create reserved account',
+      message: error.message || 'Failed to create reserved account',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Get reserved account details
- * @route   GET /api/monnify/reserved-account/:accountReference
- * @access  Private
- */
 exports.getReservedAccount = async (req, res, next) => {
   try {
     const { accountReference } = req.params;
@@ -117,25 +104,16 @@ exports.getReservedAccount = async (req, res, next) => {
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to retrieve reserved account',
+      message: error.message || 'Failed to retrieve reserved account',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    List all reserved accounts
- * @route   GET /api/monnify/reserved-accounts
- * @access  Private
- * @query   {
- *   "page": 0 (optional),
- *   "pageSize": 10 (optional)
- * }
- */
 exports.listReservedAccounts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 0;
-    const pageSize = parseInt(req.query.pageSize) || 10;
+    const page = parseInt(req.query.page, 10) || 0;
+    const pageSize = parseInt(req.query.pageSize, 10) || 10;
 
     if (pageSize > 100) {
       return res.status(400).json({
@@ -150,26 +128,18 @@ exports.listReservedAccounts = async (req, res, next) => {
       success: true,
       message: 'Reserved accounts retrieved successfully',
       data: result.data,
-      pagination: {
-        page,
-        pageSize
-      },
+      pagination: { page, pageSize },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to list reserved accounts',
+      message: error.message || 'Failed to list reserved accounts',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Deallocate a reserved account
- * @route   DELETE /api/monnify/reserved-account/:accountReference
- * @access  Private
- */
 exports.deallocateAccount = async (req, res, next) => {
   try {
     const { accountReference } = req.params;
@@ -185,34 +155,18 @@ exports.deallocateAccount = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Account deallocated successfully',
+      message: result.message || 'Account deallocated successfully',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to deallocate account',
+      message: error.message || 'Failed to deallocate account',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Initialize a payment transaction
- * @route   POST /api/monnify/initialize
- * @access  Private
- * @body    {
- *   "amount": 10000,
- *   "customerName": "John Doe",
- *   "customerEmail": "john@example.com",
- *   "paymentReference": "unique-ref-123",
- *   "paymentDescription": "Payment for subscription" (optional),
- *   "currencyCode": "NGN" (optional),
- *   "redirectUrl": "https://yourapp.com/callback" (optional),
- *   "paymentMethods": ["CARD", "ACCOUNT_TRANSFER"] (optional),
- *   "incomeSplitConfig": [] (optional)
- * }
- */
 exports.initializePayment = async (req, res, next) => {
   try {
     const {
@@ -223,11 +177,9 @@ exports.initializePayment = async (req, res, next) => {
       paymentDescription,
       currencyCode,
       redirectUrl,
-      paymentMethods,
-      incomeSplitConfig
+      paymentMethods
     } = req.body;
 
-    // Validate required fields
     if (!amount || !customerName || !customerEmail || !paymentReference) {
       return res.status(400).json({
         success: false,
@@ -241,21 +193,13 @@ exports.initializePayment = async (req, res, next) => {
       });
     }
 
-    // Validate amount
     if (typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'amount must be a positive number'
-      });
+      return res.status(400).json({ success: false, message: 'amount must be a positive number' });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(customerEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid email format' });
     }
 
     const paymentData = {
@@ -263,11 +207,10 @@ exports.initializePayment = async (req, res, next) => {
       customerName,
       customerEmail,
       paymentReference,
-      ...(paymentDescription && { paymentDescription }),
-      ...(currencyCode && { currencyCode }),
-      ...(redirectUrl && { redirectUrl }),
-      ...(paymentMethods && { paymentMethods }),
-      ...(incomeSplitConfig && { incomeSplitConfig })
+      paymentDescription,
+      currencyCode,
+      redirectUrl,
+      paymentMethods
     };
 
     const result = await monnifyService.initializePayment(paymentData);
@@ -281,27 +224,16 @@ exports.initializePayment = async (req, res, next) => {
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to initialize payment',
+      message: error.message || 'Failed to initialize payment',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Verify payment transaction
- * @route   GET /api/monnify/verify
- * @access  Private
- * @query   {
- *   "transactionReference": "ref-12345" OR
- *   "paymentReference": "ref-12345"
- * }
- */
 exports.verifyPayment = async (req, res, next) => {
   try {
     const { transactionReference, paymentReference } = req.query;
-
     const reference = transactionReference || paymentReference;
-
     if (!reference) {
       return res.status(400).json({
         success: false,
@@ -309,13 +241,7 @@ exports.verifyPayment = async (req, res, next) => {
       });
     }
 
-    let result;
-
-    if (paymentReference) {
-      result = await monnifyService.getTransactionStatus(paymentReference);
-    } else {
-      result = await monnifyService.verifyPayment(transactionReference);
-    }
+    const result = await monnifyService.verifyPayment(reference);
 
     res.status(200).json({
       success: true,
@@ -324,7 +250,7 @@ exports.verifyPayment = async (req, res, next) => {
         paymentReference: result.data?.paymentReference || result.paymentReference,
         amount: result.data?.amount || result.amount,
         status: result.data?.paymentStatus || result.status,
-        isPaid: result.data?.paymentStatus === 'PAID' || result.isPaid,
+        isPaid: result.isPaid || (result.data?.paymentStatus === 'PAID'),
         paidAt: result.data?.paidOn || result.paidAt,
         transactionReference: result.data?.transactionReference || result.transactionReference
       },
@@ -333,66 +259,12 @@ exports.verifyPayment = async (req, res, next) => {
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to verify payment',
+      message: error.message || 'Failed to verify payment',
       error: error.message
     });
   }
 };
 
-/**
- * @desc    Handle Monnify webhook notification
- * @route   POST /api/monnify/webhook
- * @access  Public (but should validate signature)
- * @header  X-Monnify-Signature (webhook signature for validation)
- * @body    {
- *   "eventType": "SUCCESSFUL_CHARGE",
- *   "eventData": { ... }
- * }
- */
-exports.handleWebhook = async (req, res, next) => {
-  try {
-    const signature = req.headers['x-monnify-signature'];
-    const payload = JSON.stringify(req.body);
-
-    // Validate webhook signature
-    const isValid = monnifyService.validateWebhookSignature(payload, signature);
-
-    if (!isValid) {
-      console.warn('Invalid webhook signature received');
-      // Log but don't fail immediately - Monnify might send without proper signature in test mode
-    }
-
-    const webhookData = req.body;
-    const processedData = await monnifyService.processWebhookNotification(webhookData);
-
-    // TODO: Store webhook data in database for auditing
-    // TODO: Update payment status in your application database
-    // TODO: Send confirmation email to customer if payment successful
-
-    res.status(200).json({
-      success: true,
-      message: 'Webhook processed successfully',
-      data: processedData,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Webhook processing error:', error.message);
-    
-    // Always return 200 to Monnify to acknowledge receipt
-    res.status(200).json({
-      success: false,
-      message: 'Webhook received but processing failed',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-};
-
-/**
- * @desc    Get transaction status
- * @route   GET /api/monnify/transaction/:paymentReference
- * @access  Private
- */
 exports.getTransactionStatus = async (req, res, next) => {
   try {
     const { paymentReference } = req.params;
@@ -415,7 +287,62 @@ exports.getTransactionStatus = async (req, res, next) => {
   } catch (error) {
     next({
       statusCode: 400,
-      message: 'Failed to get transaction status',
+      message: error.message || 'Failed to get transaction status',
+      error: error.message
+    });
+  }
+};
+
+exports.handleWebhook = async (req, res, next) => {
+  try {
+    // Accept signature header alternatives: X-Monnify-Signature, monnify-signature
+    const signature = req.headers['x-monnify-signature'] || req.headers['monnify-signature'] || req.headers['monnify_signature'];
+    // Prefer raw body if provided (see server configuration note). Fallback to JSON stringify.
+    const payload = req.rawBody ? req.rawBody : Buffer.from(JSON.stringify(req.body || {}));
+
+    // Validate webhook signature and reject invalid signatures
+    const isValid = monnifyService.validateWebhookSignature(payload, signature);
+
+    if (!isValid) {
+      console.warn('Invalid Monnify webhook signature received. Rejecting request.');
+      // Per requirements: reject invalid webhook signatures and do not process them.
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid webhook signature'
+      });
+    }
+
+    const webhookData = req.body;
+
+    // Process the webhook and return the normalized result
+    const processedData = await monnifyService.processWebhookNotification(webhookData);
+
+    // Important: Do not expose Monnify secrets in logs or responses
+    console.info('Monnify webhook processed:', {
+      eventType: processedData.eventType,
+      paymentReference: processedData.paymentReference || null,
+      transactionReference: processedData.transactionReference || null,
+      status: processedData.status
+    });
+
+    // Application integration point:
+    // - Update payment records in your DB
+    // - Emit internal events / notifications
+    // Note: This controller intentionally does not write to your DB; hook into processedData where appropriate.
+
+    // Acknowledge receipt
+    return res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully',
+      data: processedData,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Webhook handling error:', error.message);
+    // Return 500 to indicate not processed; Monnify may retry depending on configuration.
+    return res.status(500).json({
+      success: false,
+      message: 'Webhook processing failed',
       error: error.message
     });
   }
