@@ -5,7 +5,7 @@ class MonnifyService {
   constructor() {
     this.baseURL = (
       process.env.MONNIFY_BASE_URL || 'https://api.monnify.com'
-    ).replace(/\/+$/, '');
+    ).replace(/\/+$, '');
 
     this.apiKey = process.env.MONNIFY_API_KEY;
     this.secretKey = process.env.MONNIFY_SECRET_KEY;
@@ -633,10 +633,40 @@ class MonnifyService {
       await this.getAccessToken();
       return true;
     } catch (error) {
-      console.error(
-        'Monnify API status check failed:',
-        error.message
-      );
+      // Only log the HTTP status and Monnify response fields. Do NOT log
+      // API keys, secrets, access tokens, or any other sensitive data that
+      // may be present on the original error object (e.g. axios config).
+      try {
+        const status =
+          error.statusCode ||
+          error.response?.status ||
+          error.response?.statusCode ||
+          undefined;
+
+        const monnify =
+          error.monnifyResponse ||
+          error.response?.data ||
+          undefined;
+
+        const responseMessage = monnify?.responseMessage;
+        const responseCode = monnify?.responseCode;
+
+        const parts = [];
+        if (status !== undefined) parts.push(`status=${status}`);
+        if (responseMessage !== undefined) parts.push(`responseMessage="${String(responseMessage)}"`);
+        if (responseCode !== undefined) parts.push(`responseCode=${String(responseCode)}`);
+
+        if (parts.length > 0) {
+          console.error('Monnify API status check failed:', parts.join(' '));
+        } else {
+          // Fallback message without exposing any error internals.
+          console.error('Monnify API status check failed: unknown authentication error');
+        }
+      } catch (logError) {
+        // Ensure we never throw from the logging path. If something unexpected
+        // occurs while extracting fields, log a generic message only.
+        console.error('Monnify API status check failed: unknown authentication error');
+      }
 
       return false;
     }
