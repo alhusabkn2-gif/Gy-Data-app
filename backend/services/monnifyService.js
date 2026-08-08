@@ -1,4 +1,5 @@
 const axios = require('axios');
+const crypto = require('crypto');
 
 class MonnifyService {
   constructor() {
@@ -6,28 +7,23 @@ class MonnifyService {
     this.apiKey = process.env.MONNIFY_API_KEY;
     this.secretKey = process.env.MONNIFY_SECRET_KEY;
     this.contractCode = process.env.MONNIFY_CONTRACT_CODE;
-    
+    // Dedicated webhook secret recommended (do not expose API secret to webhooks)
+    this.webhookSecret = process.env.MONNIFY_WEBHOOK_SECRET || null;
+
     if (!this.apiKey || !this.secretKey || !this.contractCode) {
       throw new Error('Monnify credentials are not properly configured in environment variables');
     }
 
     this.accessToken = null;
-    this.tokenExpiry = null;
+    this.tokenExpiry = null; // timestamp in ms
   }
 
-  /**
-   * Generate Basic Auth credentials for Monnify API
-   * @returns {string} Base64 encoded credentials
-   */
+  // Base64 Basic auth for token request
   getBasicAuth() {
     const credentials = `${this.apiKey}:${this.secretKey}`;
     return Buffer.from(credentials).toString('base64');
   }
 
-  /**
-   * Get authorization headers
-   * @returns {object} Authorization headers
-   */
   getAuthHeaders() {
     return {
       Authorization: `Basic ${this.getBasicAuth()}`,
@@ -35,10 +31,7 @@ class MonnifyService {
     };
   }
 
-  /**
-   * Get Bearer token headers (for authenticated requests)
-   * @returns {object} Bearer token headers
-   */
+  // Ensure we have a valid bearer token
   async getBearerHeaders() {
     const token = await this.getAccessToken();
     return {
@@ -47,13 +40,10 @@ class MonnifyService {
     };
   }
 
-  /**
-   * Get or refresh access token from Monnify
-   * @returns {Promise<string>} Access token
-   */
+  // Retrieve access token from Monnify (caches until expiry)
   async getAccessToken() {
     try {
-      // Check if token is still valid
+      // return cached if still valid
       if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
         return this.accessToken;
       }
@@ -61,33 +51,29 @@ class MonnifyService {
       const response = await axios.post(
         `${this.baseURL}/api/v1/auth/login`,
         {},
-        {
-          headers: this.getAuthHeaders()
-        }
+        { headers: this.getAuthHeaders(), timeout: 10000 }
       );
 
       if (!response.data || !response.data.responseBody || !response.data.responseBody.accessToken) {
-        throw new Error('Failed to retrieve access token from Monnify');
+        throw new Error('Invalid authentication response from Monnify');
       }
 
       const { accessToken, expiresIn } = response.data.responseBody;
-      
-      // Store token and calculate expiry time (subtract 5 minutes buffer)
+
+      // expiresIn is in seconds. Add a safety buffer of 2 minutes.
+      const bufferMs = 2 * 60 * 1000;
       this.accessToken = accessToken;
-      this.tokenExpiry = Date.now() + (expiresIn * 1000) - (5 * 60 * 1000);
+      this.tokenExpiry = Date.now() + expiresIn * 1000 - bufferMs;
 
       return accessToken;
-    } catch (error) {
-      console.error('Error getting Monnify access token:', error.response?.data || error.message);
-      throw new Error(`Failed to authenticate with Monnify: ${error.message}`);
+    } catch (err) {
+      // Avoid leaking sensitive info. Log internal details to server logs.
+      console.error('Monnify getAccessToken error:', err.response?.data || err.message);
+      throw new Error('Failed to authenticate with Monnify');
     }
   }
 
-  /**
-   * Create a Reserved Account (Virtual Account)
-   * @param {object} accountData - Account details
-   * @returns {Promise<object>} Created account details
-   */
+  // Create a reserved (virtual) account - use v2 endpoint
   async createReservedAccount(accountData) {
     try {
       const {
@@ -95,8 +81,10 @@ class MonnifyService {
         accountName,
         currencyCode = 'NGN',
         contractCode = this.contractCode,
-        incomeSplitConfig = [],
-        allocationPercentage = null
+        customerEmail,
+        customerName,
+        bvn,
+        customerPhoneNumber
       } = accountData;
 
       if (!accountReference || !accountName) {
@@ -110,65 +98,116 @@ class MonnifyService {
         accountName,
         currencyCode,
         contractCode,
-        incomeSplitConfig,
-        allocationPercentage
+        ...(customerEmail && { customerEmail }),
+        ...(customerName && { customerName }),
+        ...(bvn && { bvn }),
+        ...(customerPhoneNumber && { customerPhoneNumber })
       };
 
       const response = await axios.post(
-        `${this.baseURL}/api/v1/bank-transfer/reserved-accounts`,
+        `${this.baseURL}/api/v2/bank-transfer/reserved-accounts`,
         payload,
-        { headers }
+        { headers, timeout: 10000 }
       );
 
-      if (!response.data || !response.data.responseBody) {
+      if (!response.data) {
         throw new Error('Invalid response from Monnify API');
       }
 
       return {
-        success: response.data.requestSuccessful,
-        data: response.data.responseBody,
-        message: response.data.responseMessage
+        success: !!response.data.requestSuccessful,
+        data: response.data.responseBody || {},
+        message: response.data.responseMessage || null
       };
-    } catch (error) {
-      console.error('Error creating reserved account:', error.response?.data || error.message);
-      throw new Error(`Failed to create reserved account: ${error.response?.data?.responseMessage || error.message}`);
+    } catch (err) {
+      console.error('Error creating reserved account:', err.response?.data || err.message);
+      const safeMessage = err.response?.data?.responseMessage || 'Failed to create reserved account';
+      throw new Error(safeMessage);
     }
   }
 
-  /**
-   * Get Reserved Account Details
-   * @param {string} accountReference - The account reference
-   * @returns {Promise<object>} Account details
-   */
+  // Get reserved account details (v2)
   async getReservedAccount(accountReference) {
+    try {
+      if (!accountReference) throw new Error('accountReference is required');
+
+      const headers = await this.getBearerHeaders();
+
+      const response = await axios.get(
+        `${this.baseURL}/api/v2/bank-transfer/reserved-accounts/${encodeURIComponent(accountReference)}`,
+        { headers, timeout: 10000 }
+      );
+
+      if (!response.data) {
+        throw new Error('Invalid response from Monnify API');
+      }
+
+      return {
+        success: !!response.data.requestSuccessful,
+        data: response.data.responseBody || {},
+        message: response.data.responseMessage || null
+      };
+    } catch (err) {
+      console.error('Error fetching reserved account:', err.response?.data || err.message);
+      const safeMessage = err.response?.data?.responseMessage || 'Failed to fetch reserved account';
+      throw new Error(safeMessage);
+    }
+  }
+
+  // List reserved accounts (v2, paginated)
+  async listReservedAccounts(page = 0, pageSize = 10) {
     try {
       const headers = await this.getBearerHeaders();
 
       const response = await axios.get(
-        `${this.baseURL}/api/v1/bank-transfer/reserved-accounts/${accountReference}`,
-        { headers }
+        `${this.baseURL}/api/v2/bank-transfer/reserved-accounts?page=${Number(page)}&pageSize=${Number(pageSize)}`,
+        { headers, timeout: 10000 }
       );
 
-      if (!response.data || !response.data.responseBody) {
+      if (!response.data) {
         throw new Error('Invalid response from Monnify API');
       }
 
       return {
-        success: response.data.requestSuccessful,
-        data: response.data.responseBody,
-        message: response.data.responseMessage
+        success: !!response.data.requestSuccessful,
+        data: response.data.responseBody || {},
+        message: response.data.responseMessage || null
       };
-    } catch (error) {
-      console.error('Error fetching reserved account:', error.response?.data || error.message);
-      throw new Error(`Failed to fetch reserved account: ${error.response?.data?.responseMessage || error.message}`);
+    } catch (err) {
+      console.error('Error listing reserved accounts:', err.response?.data || err.message);
+      const safeMessage = err.response?.data?.responseMessage || 'Failed to list reserved accounts';
+      throw new Error(safeMessage);
     }
   }
 
-  /**
-   * Initialize a payment transaction
-   * @param {object} paymentData - Payment details
-   * @returns {Promise<object>} Payment initialization response
-   */
+  // Deallocate reserved account (v2)
+  async deallocateAccount(accountReference) {
+    try {
+      if (!accountReference) throw new Error('accountReference is required');
+
+      const headers = await this.getBearerHeaders();
+
+      const response = await axios.delete(
+        `${this.baseURL}/api/v2/bank-transfer/reserved-accounts/${encodeURIComponent(accountReference)}`,
+        { headers, timeout: 10000 }
+      );
+
+      if (!response.data) {
+        throw new Error('Invalid response from Monnify API');
+      }
+
+      return {
+        success: response.data.requestSuccessful === undefined ? true : !!response.data.requestSuccessful,
+        message: response.data.responseMessage || 'Account deallocated successfully'
+      };
+    } catch (err) {
+      console.error('Error deallocating reserved account:', err.response?.data || err.message);
+      const safeMessage = err.response?.data?.responseMessage || 'Failed to deallocate account';
+      throw new Error(safeMessage);
+    }
+  }
+
+  // Initialize a payment (use v2 merchant init-transaction)
   async initializePayment(paymentData) {
     try {
       const {
@@ -176,12 +215,11 @@ class MonnifyService {
         customerName,
         customerEmail,
         paymentReference,
-        paymentDescription = 'Payment from Gy-Data App',
+        paymentDescription = 'Payment',
         currencyCode = 'NGN',
         contractCode = this.contractCode,
         redirectUrl,
-        paymentMethods = ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
-        incomeSplitConfig = []
+        paymentMethods = ['CARD', 'ACCOUNT_TRANSFER', 'USSD']
       } = paymentData;
 
       if (!amount || !customerName || !customerEmail || !paymentReference) {
@@ -198,249 +236,14 @@ class MonnifyService {
         paymentDescription,
         currencyCode,
         contractCode,
-        redirectUrl,
-        paymentMethods,
-        incomeSplitConfig
+        ...(redirectUrl && { redirectUrl }),
+        ...(paymentMethods && { paymentMethods })
       };
 
       const response = await axios.post(
-        `${this.baseURL}/api/v1/merchant/transactions/init-transaction`,
+        `${this.baseURL}/api/v2/merchant/transactions/init-transaction`,
         payload,
-        { headers }
-      );
-
-      if (!response.data || !response.data.responseBody) {
-        throw new Error('Invalid response from Monnify API');
-      }
-
-      return {
-        success: response.data.requestSuccessful,
-        data: response.data.responseBody,
-        message: response.data.responseMessage
-      };
-    } catch (error) {
-      console.error('Error initializing payment:', error.response?.data || error.message);
-      throw new Error(`Failed to initialize payment: ${error.response?.data?.responseMessage || error.message}`);
-    }
-  }
-
-  /**
-   * Verify a payment transaction
-   * @param {string} transactionReference - Transaction reference or payment reference
-   * @returns {Promise<object>} Transaction details
-   */
-  async verifyPayment(transactionReference) {
-    try {
-      if (!transactionReference) {
-        throw new Error('transactionReference is required');
-      }
-
-      const headers = await this.getBearerHeaders();
-
-      const response = await axios.get(
-        `${this.baseURL}/api/v1/merchant/transactions/query?transactionReference=${transactionReference}`,
-        { headers }
-      );
-
-      if (!response.data || !response.data.responseBody) {
-        throw new Error('Invalid response from Monnify API');
-      }
-
-      return {
-        success: response.data.requestSuccessful,
-        data: response.data.responseBody,
-        message: response.data.responseMessage,
-        isPaid: response.data.responseBody.paymentStatus === 'PAID'
-      };
-    } catch (error) {
-      console.error('Error verifying payment:', error.response?.data || error.message);
-      throw new Error(`Failed to verify payment: ${error.response?.data?.responseMessage || error.message}`);
-    }
-  }
-
-  /**
-   * Get transaction status by paymentReference
-   * @param {string} paymentReference - Payment reference
-   * @returns {Promise<object>} Transaction status
-   */
-  async getTransactionStatus(paymentReference) {
-    try {
-      if (!paymentReference) {
-        throw new Error('paymentReference is required');
-      }
-
-      const headers = await this.getBearerHeaders();
-
-      const response = await axios.get(
-        `${this.baseURL}/api/v1/merchant/transactions/query?paymentReference=${paymentReference}`,
-        { headers }
-      );
-
-      if (!response.data || !response.data.responseBody) {
-        throw new Error('Invalid response from Monnify API');
-      }
-
-      const transaction = response.data.responseBody;
-
-      return {
-        success: response.data.requestSuccessful,
-        paymentReference: transaction.paymentReference,
-        amount: transaction.amount,
-        status: transaction.paymentStatus,
-        isPaid: transaction.paymentStatus === 'PAID',
-        paidAt: transaction.paidOn,
-        transactionReference: transaction.transactionReference,
-        message: response.data.responseMessage
-      };
-    } catch (error) {
-      console.error('Error getting transaction status:', error.response?.data || error.message);
-      throw new Error(`Failed to get transaction status: ${error.response?.data?.responseMessage || error.message}`);
-    }
-  }
-
-  /**
-   * Validate webhook signature from Monnify
-   * @param {string} payload - Request body as string
-   * @param {string} signature - Signature from header
-   * @returns {boolean} Is signature valid
-   */
-  validateWebhookSignature(payload, signature) {
-    try {
-      const crypto = require('crypto');
-      
-      // Create HMAC SHA512 hash
-      const hash = crypto
-        .createHmac('sha512', this.secretKey)
-        .update(payload)
-        .digest('base64');
-
-      return hash === signature;
-    } catch (error) {
-      console.error('Error validating webhook signature:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * Process webhook notification from Monnify
-   * @param {object} webhookData - Webhook payload
-   * @returns {object} Processed webhook data
-   */
-  async processWebhookNotification(webhookData) {
-    try {
-      const {
-        eventType,
-        eventData
-      } = webhookData;
-
-      if (!eventType || !eventData) {
-        throw new Error('Invalid webhook data structure');
-      }
-
-      // Handle different event types
-      switch (eventType) {
-        case 'SUCCESSFUL_CHARGE':
-          return {
-            eventType,
-            status: 'success',
-            transactionReference: eventData.transactionReference,
-            paymentReference: eventData.paymentReference,
-            amount: eventData.amount,
-            paidBy: eventData.paidBy,
-            paidOn: eventData.paidOn,
-            message: 'Payment successful'
-          };
-
-        case 'FAILED_CHARGE':
-          return {
-            eventType,
-            status: 'failed',
-            transactionReference: eventData.transactionReference,
-            paymentReference: eventData.paymentReference,
-            amount: eventData.amount,
-            message: 'Payment failed'
-          };
-
-        case 'PENDING_CHARGE':
-          return {
-            eventType,
-            status: 'pending',
-            transactionReference: eventData.transactionReference,
-            paymentReference: eventData.paymentReference,
-            amount: eventData.amount,
-            message: 'Payment pending'
-          };
-
-        case 'REFUND_PROCESSED':
-          return {
-            eventType,
-            status: 'refunded',
-            transactionReference: eventData.transactionReference,
-            refundReference: eventData.refundReference,
-            amount: eventData.amount,
-            message: 'Refund processed'
-          };
-
-        default:
-          return {
-            eventType,
-            status: 'unknown',
-            message: 'Unknown event type',
-            data: eventData
-          };
-      }
-    } catch (error) {
-      console.error('Error processing webhook notification:', error.message);
-      throw new Error(`Failed to process webhook: ${error.message}`);
-    }
-  }
-
-  /**
-   * List all reserved accounts
-   * @param {number} page - Page number (default: 0)
-   * @param {number} pageSize - Page size (default: 10)
-   * @returns {Promise<object>} List of reserved accounts
-   */
-  async listReservedAccounts(page = 0, pageSize = 10) {
-    try {
-      const headers = await this.getBearerHeaders();
-
-      const response = await axios.get(
-        `${this.baseURL}/api/v1/bank-transfer/reserved-accounts?page=${page}&pageSize=${pageSize}`,
-        { headers }
-      );
-
-      if (!response.data || !response.data.responseBody) {
-        throw new Error('Invalid response from Monnify API');
-      }
-
-      return {
-        success: response.data.requestSuccessful,
-        data: response.data.responseBody,
-        message: response.data.responseMessage
-      };
-    } catch (error) {
-      console.error('Error listing reserved accounts:', error.response?.data || error.message);
-      throw new Error(`Failed to list reserved accounts: ${error.response?.data?.responseMessage || error.message}`);
-    }
-  }
-
-  /**
-   * Deallocate a reserved account
-   * @param {string} accountReference - Account reference to deallocate
-   * @returns {Promise<object>} Deallocation response
-   */
-  async deallocateAccount(accountReference) {
-    try {
-      if (!accountReference) {
-        throw new Error('accountReference is required');
-      }
-
-      const headers = await this.getBearerHeaders();
-
-      const response = await axios.delete(
-        `${this.baseURL}/api/v1/bank-transfer/reserved-accounts/${accountReference}`,
-        { headers }
+        { headers, timeout: 10000 }
       );
 
       if (!response.data) {
@@ -448,25 +251,218 @@ class MonnifyService {
       }
 
       return {
-        success: response.data.requestSuccessful || true,
-        message: response.data.responseMessage || 'Account deallocated successfully'
+        success: !!response.data.requestSuccessful,
+        data: response.data.responseBody || {},
+        message: response.data.responseMessage || null
       };
-    } catch (error) {
-      console.error('Error deallocating account:', error.response?.data || error.message);
-      throw new Error(`Failed to deallocate account: ${error.response?.data?.responseMessage || error.message}`);
+    } catch (err) {
+      console.error('Error initializing payment:', err.response?.data || err.message);
+      const safeMessage = err.response?.data?.responseMessage || 'Failed to initialize payment';
+      throw new Error(safeMessage);
     }
   }
 
-  /**
-   * Check if Monnify API is accessible
-   * @returns {Promise<boolean>} API status
-   */
+  // Verify a payment by transactionReference or paymentReference (v2 query)
+  async verifyPayment(reference) {
+    try {
+      if (!reference) throw new Error('transactionReference or paymentReference is required');
+
+      const headers = await this.getBearerHeaders();
+
+      const url = `${this.baseURL}/api/v2/merchant/transactions/query`;
+      // Try as transactionReference first; callers should pass the right name
+      const response = await axios.get(`${url}?transactionReference=${encodeURIComponent(reference)}`, { headers, timeout: 10000 });
+
+      if (!response.data) {
+        throw new Error('Invalid response from Monnify API');
+      }
+
+      // If responseBody empty, still return safe structure
+      const body = response.data.responseBody || {};
+
+      const paymentStatus = body.paymentStatus || body.status || null;
+
+      return {
+        success: !!response.data.requestSuccessful,
+        data: body,
+        message: response.data.responseMessage || null,
+        isPaid: paymentStatus === 'PAID' || paymentStatus === 'SUCCESS'
+      };
+    } catch (err) {
+      // If transactionReference query failed, attempt paymentReference
+      if (err.response && err.response.status === 404) {
+        try {
+          const headers = await this.getBearerHeaders();
+          const url = `${this.baseURL}/api/v2/merchant/transactions/query?paymentReference=${encodeURIComponent(reference)}`;
+          const response = await axios.get(url, { headers, timeout: 10000 });
+          const body = response.data.responseBody || {};
+          const paymentStatus = body.paymentStatus || body.status || null;
+          return {
+            success: !!response.data.requestSuccessful,
+            data: body,
+            message: response.data.responseMessage || null,
+            isPaid: paymentStatus === 'PAID' || paymentStatus === 'SUCCESS'
+          };
+        } catch (err2) {
+          console.error('Error verifying payment by paymentReference:', err2.response?.data || err2.message);
+          throw new Error(err2.response?.data?.responseMessage || 'Failed to verify payment');
+        }
+      }
+
+      console.error('Error verifying payment:', err.response?.data || err.message);
+      throw new Error(err.response?.data?.responseMessage || 'Failed to verify payment');
+    }
+  }
+
+  // Get transaction status by paymentReference (wrapper - v2)
+  async getTransactionStatus(paymentReference) {
+    try {
+      if (!paymentReference) throw new Error('paymentReference is required');
+
+      const headers = await this.getBearerHeaders();
+
+      const response = await axios.get(
+        `${this.baseURL}/api/v2/merchant/transactions/query?paymentReference=${encodeURIComponent(paymentReference)}`,
+        { headers, timeout: 10000 }
+      );
+
+      if (!response.data) {
+        throw new Error('Invalid response from Monnify API');
+      }
+
+      const transaction = response.data.responseBody || {};
+
+      return {
+        success: !!response.data.requestSuccessful,
+        paymentReference: transaction.paymentReference,
+        amount: transaction.amount || transaction.amountPaid,
+        status: transaction.paymentStatus || transaction.status,
+        isPaid: transaction.paymentStatus === 'PAID' || transaction.status === 'SUCCESS',
+        paidAt: transaction.paidOn || transaction.settledAt || null,
+        transactionReference: transaction.transactionReference,
+        message: response.data.responseMessage || null
+      };
+    } catch (err) {
+      console.error('Error getting transaction status:', err.response?.data || err.message);
+      throw new Error(err.response?.data?.responseMessage || 'Failed to get transaction status');
+    }
+  }
+
+  // Validate webhook signature. Use MONNIFY_WEBHOOK_SECRET when present; fallback to secretKey is possible but not recommended.
+  validateWebhookSignature(payload, signature) {
+    try {
+      const key = this.webhookSecret || this.secretKey;
+      if (!key) return false;
+      if (!signature) return false;
+      // payload must be a Buffer or string.
+      const hmac = crypto.createHmac('sha512', key).update(payload).digest();
+      const signatureBase64 = hmac.toString('base64');
+      const signatureHex = hmac.toString('hex');
+
+      // Accept the signature if it matches base64 or hex representation.
+      return signature === signatureBase64 || signature === signatureHex;
+    } catch (err) {
+      console.error('Error validating webhook signature:', err.message);
+      return false;
+    }
+  }
+
+  // Process webhook payloads - map known event types to normalized objects
+  async processWebhookNotification(webhookData) {
+    try {
+      // Monnify may use a variety of eventType names. Normalize common ones.
+      const eventType = webhookData.eventType || webhookData.event || null;
+      const eventData = webhookData.eventData || webhookData.data || webhookData.data || {};
+
+      if (!eventType || !eventData) {
+        throw new Error('Invalid webhook payload');
+      }
+
+      // Normalize fields from eventData
+      const paymentReference = eventData.paymentReference || eventData.paymentreference || eventData.reference || null;
+      const transactionReference = eventData.transactionReference || eventData.transactionreference || eventData.transaction_id || null;
+      const amount = eventData.amountPaid || eventData.amount || eventData.paymentAmount || null;
+      const status = (eventData.status || eventData.paymentStatus || '').toString().toUpperCase();
+
+      // Map common eventTypes to normalized statuses
+      const lowered = eventType.toString().toUpperCase();
+
+      switch (lowered) {
+        case 'SUCCESSFUL_CHARGE':
+        case 'TRANSACTION_SUCCESSFUL':
+        case 'TRANSACTION_SUCCESS':
+        case 'SUCCESSFUL_TRANSACTION':
+        case 'PAYMENT_SUCCESSFUL':
+        case 'CHARGE.SUCCESS':
+          return {
+            eventType,
+            status: 'success',
+            paymentReference,
+            transactionReference,
+            amount,
+            raw: webhookData
+          };
+
+        case 'FAILED_CHARGE':
+        case 'TRANSACTION_FAILED':
+        case 'PAYMENT_FAILED':
+        case 'CHARGE.FAILED':
+          return {
+            eventType,
+            status: 'failed',
+            paymentReference,
+            transactionReference,
+            amount,
+            raw: webhookData
+          };
+
+        case 'PENDING_CHARGE':
+        case 'TRANSACTION_PENDING':
+        case 'PENDING':
+          return {
+            eventType,
+            status: 'pending',
+            paymentReference,
+            transactionReference,
+            amount,
+            raw: webhookData
+          };
+
+        case 'REFUND_PROCESSED':
+        case 'REFUND':
+        case 'REFUND_SUCCESS':
+          return {
+            eventType,
+            status: 'refunded',
+            paymentReference,
+            transactionReference,
+            amount,
+            raw: webhookData
+          };
+
+        default:
+          return {
+            eventType,
+            status: status || 'unknown',
+            paymentReference,
+            transactionReference,
+            amount,
+            raw: webhookData
+          };
+      }
+    } catch (err) {
+      console.error('Error processing webhook notification:', err.message);
+      throw new Error('Failed to process webhook');
+    }
+  }
+
+  // Check API connectivity by attempting to fetch an access token
   async checkApiStatus() {
     try {
       await this.getAccessToken();
       return true;
-    } catch (error) {
-      console.error('Monnify API status check failed:', error.message);
+    } catch (err) {
+      console.error('Monnify API status check failed:', err.message);
       return false;
     }
   }
