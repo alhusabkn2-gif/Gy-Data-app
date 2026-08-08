@@ -5,7 +5,7 @@ class MonnifyService {
   constructor() {
     this.baseURL = (
       process.env.MONNIFY_BASE_URL || 'https://api.monnify.com'
-    ).replace(/\/+$, '');
+    ).replace(/\/+$/, '');
 
     this.apiKey = process.env.MONNIFY_API_KEY;
     this.secretKey = process.env.MONNIFY_SECRET_KEY;
