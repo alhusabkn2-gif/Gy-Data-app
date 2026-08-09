@@ -1,8 +1,19 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { supabaseAdmin } = require('../services/supabaseService');
 
 const router = express.Router();
+
+function hashPin(pin) {
+  return crypto
+    .createHash('sha256')
+    .update(String(pin))
+    .digest('hex');
+}
+
+function cleanPhone(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
 
 router.post('/register', async (req, res) => {
   try {
@@ -12,84 +23,55 @@ router.post('/register', async (req, res) => {
       email,
       referral_code,
       login_pin,
-      purchase_pin,
+      purchase_pin
     } = req.body;
 
-    if (!full_name || !phone || !login_pin || !purchase_pin) {
+    const clean = cleanPhone(phone);
+
+    if (!full_name || !clean || !login_pin || !purchase_pin) {
       return res.status(400).json({
         success: false,
-        message: 'Full name, phone, login PIN and purchase PIN are required',
-      });
-    }
-
-    const cleanPhone = String(phone).replace(/\D/g, '');
-
-    if (cleanPhone.length !== 11) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid phone number',
+        message: 'Full name, phone, login PIN and purchase PIN are required'
       });
     }
 
     if (!/^\d{6}$/.test(String(login_pin))) {
       return res.status(400).json({
         success: false,
-        message: 'Login PIN must be 6 digits',
+        message: 'Login PIN must be 6 digits'
       });
     }
 
     if (!/^\d{4}$/.test(String(purchase_pin))) {
       return res.status(400).json({
         success: false,
-        message: 'Purchase PIN must be 4 digits',
+        message: 'Purchase PIN must be 4 digits'
       });
     }
 
     const { data: existing } = await supabaseAdmin
       .from('profiles')
-      .select('phone')
-      .eq('phone', cleanPhone)
+      .select('id')
+      .eq('phone', clean)
       .maybeSingle();
 
     if (existing) {
       return res.status(409).json({
         success: false,
-        message: 'Phone number already registered',
+        message: 'Phone number already registered'
       });
     }
-
-    let referredBy = null;
-
-    if (referral_code) {
-      const { data: referrer } = await supabaseAdmin
-        .from('profiles')
-        .select('phone')
-        .eq('referral_code', String(referral_code).toUpperCase())
-        .maybeSingle();
-
-      if (referrer) referredBy = referrer.phone;
-    }
-
-    const loginPinHash = await bcrypt.hash(String(login_pin), 12);
-    const purchasePinHash = await bcrypt.hash(String(purchase_pin), 12);
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .insert({
-        full_name: full_name.trim(),
-        phone: cleanPhone,
-        email: email?.trim() || null,
-        referred_by: referredBy,
-        login_pin: loginPinHash,
-        purchase_pin: purchasePinHash,
-        wallet_balance: 0,
-        cashback_balance: 0,
-        kyc_status: 'unverified',
-        is_admin: false,
+        full_name: String(full_name).trim(),
+        phone: clean,
+        email: email ? String(email).trim() : null,
+        login_pin: hashPin(login_pin),
+        purchase_pin: hashPin(purchase_pin)
       })
-      .select(
-        'id, phone, full_name, email, referral_code, referred_by, wallet_balance, cashback_balance, kyc_status, is_admin, created_at'
-      )
+      .select()
       .single();
 
     if (error) {
@@ -97,29 +79,23 @@ router.post('/register', async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message: 'Unable to create account',
+        message: 'Unable to create account'
       });
     }
 
-    if (referredBy) {
-      await supabaseAdmin.from('referrals').insert({
-        referrer_phone: referredBy,
-        referred_phone: cleanPhone,
-        reward_amount: 100,
-        status: 'completed',
-      });
-    }
+    delete data.login_pin;
+    delete data.purchase_pin;
 
     return res.status(201).json({
       success: true,
-      user: data,
+      user: data
     });
   } catch (error) {
     console.error('Register error:', error.message);
 
     return res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 });
@@ -127,45 +103,32 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { phone, login_pin } = req.body;
+    const clean = cleanPhone(phone);
 
-    if (!phone || !login_pin) {
+    if (!clean || !login_pin) {
       return res.status(400).json({
         success: false,
-        message: 'Phone and login PIN are required',
+        message: 'Phone and login PIN are required'
       });
     }
-
-    const cleanPhone = String(phone).replace(/\D/g, '');
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .eq('phone', cleanPhone)
+      .eq('phone', clean)
       .maybeSingle();
 
     if (error) {
       return res.status(500).json({
         success: false,
-        message: 'Unable to login',
+        message: 'Unable to login'
       });
     }
 
-    if (!data) {
+    if (!data || data.login_pin !== hashPin(login_pin)) {
       return res.status(401).json({
         success: false,
-        message: 'Account not found',
-      });
-    }
-
-    const validPin = await bcrypt.compare(
-      String(login_pin),
-      String(data.login_pin)
-    );
-
-    if (!validPin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Incorrect PIN',
+        message: 'Incorrect phone or PIN'
       });
     }
 
@@ -174,14 +137,14 @@ router.post('/login', async (req, res) => {
 
     return res.json({
       success: true,
-      user: data,
+      user: data
     });
   } catch (error) {
     console.error('Login error:', error.message);
 
     return res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 });
