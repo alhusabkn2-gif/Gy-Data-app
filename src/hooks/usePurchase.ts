@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useCashback } from './useCashback';
 import type { ReceiptData } from '../components/ReceiptScreen';
 
 interface PurchaseParams {
@@ -16,13 +15,14 @@ interface PurchaseParams {
 
 export function usePurchase() {
   const { user, refreshUser } = useAuth();
-  const { getCashbackPercent } = useCashback();
+
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [stage, setStage] = useState<'pin' | 'processing' | 'error'>('pin');
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
-  const [pendingParams, setPendingParams] = useState<PurchaseParams | null>(null);
+  const [pendingParams, setPendingParams] =
+    useState<PurchaseParams | null>(null);
 
   const startPurchase = (params: PurchaseParams) => {
     setPendingParams(params);
@@ -34,24 +34,11 @@ export function usePurchase() {
 
   const handlePinComplete = async (val: string) => {
     if (!user || !pendingParams) return;
-    if (val !== user.purchase_pin) {
-      setPinError('Incorrect purchase PIN');
-      setPin('');
-      return;
-    }
+
     setPinError('');
     setStage('processing');
 
-    if (pendingParams.amount > user.wallet_balance) {
-      setTimeout(() => {
-        setStage('error');
-        setPinError('Insufficient wallet balance. Please fund your wallet.');
-      }, 1200);
-      return;
-    }
-
     try {
-      // Call backend endpoint to process purchase
       const response = await fetch('/api/purchase', {
         method: 'POST',
         headers: {
@@ -66,13 +53,14 @@ export function usePurchase() {
           network: pendingParams.network,
           metadata: pendingParams.metadata,
           generatedPin: pendingParams.generatedPin,
-          cashbackPercent: getCashbackPercent(pendingParams.service, pendingParams.productCashbackPercent),
+          purchase_pin: val,
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Purchase failed');
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Purchase failed');
       }
 
       const {
@@ -80,12 +68,10 @@ export function usePurchase() {
         newBalance,
         prevBalance,
         cashbackEarned,
-      } = await response.json();
+      } = result;
 
-      // Refresh user data from backend
       await refreshUser();
 
-      // Build receipt
       setReceipt({
         reference: transaction.reference,
         network: pendingParams.network,
@@ -99,17 +85,42 @@ export function usePurchase() {
         subtitle: `${pendingParams.product} completed`,
         cashbackEarned,
         extraRows: [
-          ...(pendingParams.metadata ? Object.entries(pendingParams.metadata).filter(([k]) => k !== 'generated_pin').map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), value: String(v) })) : []),
-          ...(pendingParams.generatedPin ? [{ label: 'Generated PIN', value: pendingParams.generatedPin }] : []),
+          ...(pendingParams.metadata
+            ? Object.entries(pendingParams.metadata)
+                .filter(([key]) => key !== 'generated_pin')
+                .map(([key, value]) => ({
+                  label: key
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, (char) => char.toUpperCase()),
+                  value: String(value),
+                }))
+            : []),
+          ...(pendingParams.generatedPin
+            ? [
+                {
+                  label: 'Generated PIN',
+                  value: pendingParams.generatedPin,
+                },
+              ]
+            : []),
         ],
       });
-      setTimeout(() => setShowPinModal(false), 1000);
-    } catch (err) {
-      console.error('Purchase error:', err);
+
       setTimeout(() => {
-        setStage('error');
-        setPinError(err instanceof Error ? err.message : 'Transaction failed. Please try again.');
-      }, 1200);
+        setShowPinModal(false);
+        setPin('');
+        setStage('pin');
+      }, 1000);
+    } catch (error) {
+      console.error('Purchase error:', error);
+
+      setStage('error');
+      setPinError(
+        error instanceof Error
+          ? error.message
+          : 'Transaction failed. Please try again.'
+      );
+      setPin('');
     }
   };
 
@@ -118,12 +129,24 @@ export function usePurchase() {
     setStage('pin');
     setPin('');
     setPinError('');
+    setPendingParams(null);
   };
 
-  const closeReceipt = () => setReceipt(null);
+  const closeReceipt = () => {
+    setReceipt(null);
+    setPendingParams(null);
+  };
 
   return {
-    showPinModal, pin, setPin, pinError, stage, receipt,
-    startPurchase, handlePinComplete, closePinModal, closeReceipt,
+    showPinModal,
+    pin,
+    setPin,
+    pinError,
+    stage,
+    receipt,
+    startPurchase,
+    handlePinComplete,
+    closePinModal,
+    closeReceipt,
   };
-}
+} 
