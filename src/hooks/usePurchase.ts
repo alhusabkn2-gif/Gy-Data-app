@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCashback } from './useCashback';
-import { supabase } from '../lib/supabase';
 import type { ReceiptData } from '../components/ReceiptScreen';
 
 interface PurchaseParams {
@@ -17,7 +16,7 @@ interface PurchaseParams {
 
 export function usePurchase() {
   const { user, refreshUser } = useAuth();
-  const { creditCashback, getCashbackPercent } = useCashback();
+  const { getCashbackPercent } = useCashback();
   const [showPinModal, setShowPinModal] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -52,56 +51,50 @@ export function usePurchase() {
     }
 
     try {
-      const { data: txData, error: txError } = await supabase
-        .from('transactions')
-        .insert({
+      // Call backend endpoint to process purchase
+      const response = await fetch('/api/purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           phone: user.phone,
-          type: 'purchase',
           service: pendingParams.service,
           product: pendingParams.product,
           amount: pendingParams.amount,
-          status: 'success',
           recipient: pendingParams.recipient,
           network: pendingParams.network,
-          metadata: { ...pendingParams.metadata, ...(pendingParams.generatedPin ? { generated_pin: pendingParams.generatedPin } : {}) },
-        })
-        .select()
-        .single();
-      if (txError) throw txError;
+          metadata: pendingParams.metadata,
+          generatedPin: pendingParams.generatedPin,
+          cashbackPercent: getCashbackPercent(pendingParams.service, pendingParams.productCashbackPercent),
+        }),
+      });
 
-      const prevBalance = user.wallet_balance;
-      const newBalance = prevBalance - pendingParams.amount;
-      const { error: balError } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: newBalance, updated_at: new Date().toISOString() })
-        .eq('phone', user.phone);
-      if (balError) throw balError;
-
-      await refreshUser();
-
-      let cashbackEarned = 0;
-      const cashbackPercent = getCashbackPercent(pendingParams.service, pendingParams.productCashbackPercent);
-      if (cashbackPercent > 0) {
-        const { cashbackAmount } = await creditCashback({
-          transactionId: txData.id,
-          transactionReference: txData.reference,
-          service: pendingParams.service,
-          product: pendingParams.product,
-          transactionAmount: pendingParams.amount,
-          cashbackPercent,
-        });
-        cashbackEarned = cashbackAmount;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Purchase failed');
       }
 
+      const {
+        transaction,
+        newBalance,
+        prevBalance,
+        cashbackEarned,
+      } = await response.json();
+
+      // Refresh user data from backend
+      await refreshUser();
+
+      // Build receipt
       setReceipt({
-        reference: txData.reference,
+        reference: transaction.reference,
         network: pendingParams.network,
         phone: pendingParams.recipient,
         productName: pendingParams.product,
         amount: pendingParams.amount,
         prevBalance,
         newBalance,
-        date: txData.created_at,
+        date: transaction.created_at,
         title: 'Transaction Successful',
         subtitle: `${pendingParams.product} completed`,
         cashbackEarned,
@@ -111,10 +104,11 @@ export function usePurchase() {
         ],
       });
       setTimeout(() => setShowPinModal(false), 1000);
-    } catch {
+    } catch (err) {
+      console.error('Purchase error:', err);
       setTimeout(() => {
         setStage('error');
-        setPinError('Transaction failed. Please try again.');
+        setPinError(err instanceof Error ? err.message : 'Transaction failed. Please try again.');
       }, 1200);
     }
   };
