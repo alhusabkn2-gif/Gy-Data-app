@@ -1,42 +1,39 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+
 const monnifyRouter = require('./routes/monnify');
+const fundingRouter = require('./routes/funding');
 
 const app = express();
 
-// Enable CORS
 app.use(cors());
 
-// Capture raw request body for webhook verification while still populating req.body
 app.use(
   express.json({
     verify: (req, res, buf) => {
-      // Store the raw bytes exactly as received on req.rawBody for webhook signature verification
-      if (buf && buf.length) {
-        req.rawBody = Buffer.from(buf);
-      } else {
-        req.rawBody = Buffer.from('');
-      }
+      req.rawBody = Buffer.from(buf);
     }
   })
 );
 
-// Mount Monnify router
-app.use('/', monnifyRouter);
-
-// Root endpoint to confirm backend is running
 app.get('/', (req, res) => {
-  res.json({ status: 'Backend is running' });
+  res.json({
+    status: 'Backend is running'
+  });
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  res.json({
+    status: 'ok'
+  });
 });
 
-// Start server
+app.use('/', monnifyRouter);
+app.use('/api/funding', fundingRouter);
+
 const PORT = process.env.PORT || 10000;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
