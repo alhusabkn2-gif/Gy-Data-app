@@ -44,8 +44,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY = 'gydata_session';
 
 const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:10000';
+  import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -57,31 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        phone: profile.phone,
+        user: profile,
       })
     );
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      setLoading(false);
-      return;
-    }
-
     try {
-      const parsed = JSON.parse(stored);
+      const stored = localStorage.getItem(STORAGE_KEY);
 
-      if (!parsed.phone) {
-        localStorage.removeItem(STORAGE_KEY);
-        setLoading(false);
-        return;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+
+        if (parsed?.user) {
+          setUser(parsed.user);
+        }
       }
-
-      setLoading(false);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -156,69 +149,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-  };
-
   const refreshUser = async () => {
-    if (!user) return;
+    const stored = localStorage.getItem(STORAGE_KEY);
+
+    if (!stored) return;
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/auth/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            phone: user.phone,
-            login_pin: '',
-          }),
-        }
-      );
+      const parsed = JSON.parse(stored);
 
-      if (!response.ok) return;
-    } catch (error) {
-      console.error('Refresh user error:', error);
+      if (parsed?.user) {
+        setUser(parsed.user);
+      }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+      setUser(null);
     }
   };
 
-  const updateWalletBalance = (balance: number) => {
-    setUser((prev) =>
-      prev
-        ? {
-            ...prev,
-            wallet_balance: balance,
-          }
-        : prev
-    );
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        register,
-        logout,
-        refreshUser,
-        updateWalletBalance,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-
-  return ctx;
-}
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem(ST
