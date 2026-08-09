@@ -1,9 +1,9 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
 const monnifyRouter = require('./routes/monnify');
 const fundingRouter = require('./routes/funding');
+const authRouter = require('./routes/auth');
 
 const app = express();
 
@@ -31,6 +31,7 @@ app.get('/health', (req, res) => {
 
 app.use('/', monnifyRouter);
 app.use('/api/funding', fundingRouter);
+app.use('/api/auth', authRouter);
 
 const PORT = process.env.PORT || 10000;
 
