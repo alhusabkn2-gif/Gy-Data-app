@@ -1,5 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from 'react';
 
 export interface UserProfile {
   id: string;
@@ -8,8 +13,6 @@ export interface UserProfile {
   email: string | null;
   referral_code: string;
   referred_by: string | null;
-  login_pin: string;
-  purchase_pin: string;
   wallet_balance: number;
   cashback_balance: number;
   kyc_status: string;
@@ -40,114 +43,117 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'gydata_session';
 
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:10000';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const saveSession = (profile: UserProfile) => {
+    setUser(profile);
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        phone: profile.phone,
+      })
+    );
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        fetchUser(parsed.phone).then((u) => {
-          if (u) setUser(u);
-          else localStorage.removeItem(STORAGE_KEY);
-          setLoading(false);
-        });
-      } catch {
+
+    if (!stored) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(stored);
+
+      if (!parsed.phone) {
         localStorage.removeItem(STORAGE_KEY);
         setLoading(false);
+        return;
       }
-    } else {
+
+      setLoading(false);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
       setLoading(false);
     }
   }, []);
 
-  const fetchUser = async (phone: string): Promise<UserProfile | null> => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('phone', phone)
-      .maybeSingle();
-
-    if (error || !data) return null;
-    return data as UserProfile;
-  };
-
   const login = async (phone: string, pin: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('phone', phone)
-      .maybeSingle();
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone,
+          login_pin: pin,
+        }),
+      });
 
-    if (error) return { error: 'Network error. Please try again.' };
-    if (!data) return { error: 'Account not found. Please register.' };
-    if (data.login_pin !== pin) return { error: 'Incorrect PIN.' };
+      const result = await response.json();
 
-    setUser(data as UserProfile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ phone: data.phone }));
+      if (!response.ok || !result.success) {
+        return {
+          error: result.message || 'Login failed.',
+        };
+      }
 
-    return { error: null };
+      saveSession(result.user);
+
+      return { error: null };
+    } catch (error) {
+      console.error('Login error:', error);
+
+      return {
+        error: 'Unable to connect to server.',
+      };
+    }
   };
 
   const register = async (regData: RegisterData) => {
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('phone')
-      .eq('phone', regData.phone)
-      .maybeSingle();
-
-    if (existing) {
-      return { error: 'Phone number already registered.' };
-    }
-
-    let referredBy: string | null = null;
-
-    if (regData.referral_code) {
-      const { data: referrer } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('referral_code', regData.referral_code.toUpperCase())
-        .maybeSingle();
-
-      if (referrer) referredBy = referrer.phone;
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .insert({
-        full_name: regData.full_name,
-        phone: regData.phone,
-        email: regData.email || null,
-        referred_by: referredBy,
-        login_pin: regData.login_pin,
-        purchase_pin: regData.purchase_pin,
-        wallet_balance: 0,
-        kyc_status: 'unverified',
-        is_admin: false,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Supabase registration error:', error);
-      return { error: error.message };
-    }
-
-    if (referredBy) {
-      await supabase.from('referrals').insert({
-        referrer_phone: referredBy,
-        referred_phone: regData.phone,
-        reward_amount: 100,
-        status: 'completed',
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: regData.full_name,
+          phone: regData.phone,
+          email: regData.email || null,
+          referral_code: regData.referral_code || null,
+          login_pin: regData.login_pin,
+          purchase_pin: regData.purchase_pin,
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          error: result.message || 'Registration failed.',
+        };
+      }
+
+      saveSession(result.user);
+
+      return { error: null };
+    } catch (error) {
+      console.error('Registration error:', error);
+
+      return {
+        error: 'Unable to connect to server.',
+      };
     }
-
-    setUser(data as UserProfile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ phone: data.phone }));
-
-    return { error: null };
   };
 
   const logout = () => {
@@ -158,13 +164,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => {
     if (!user) return;
 
-    const u = await fetchUser(user.phone);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/auth/login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: user.phone,
+            login_pin: '',
+          }),
+        }
+      );
 
-    if (u) setUser(u);
+      if (!response.ok) return;
+    } catch (error) {
+      console.error('Refresh user error:', error);
+    }
   };
 
   const updateWalletBalance = (balance: number) => {
-    setUser((prev) => (prev ? { ...prev, wallet_balance: balance } : prev));
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            wallet_balance: balance,
+          }
+        : prev
+    );
   };
 
   return (
