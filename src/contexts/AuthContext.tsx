@@ -55,9 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({
-        user: profile,
-      })
+      JSON.stringify({ user: profile })
     );
   };
 
@@ -168,4 +166,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(ST
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
+  const updateWalletBalance = (balance: number) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+
+      const updated = {
+        ...prev,
+        wallet_balance: balance,
+      };
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ user: updated })
+      );
+
+      return updated;
+    });
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        refreshUser,
+        updateWalletBalance,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      'useAuth must be used within AuthProvider'
+    );
+  }
+
+  return context;
+}
