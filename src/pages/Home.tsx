@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   ArrowUpRight,
   Sparkles,
-  Nfc,
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -37,28 +36,28 @@ const quickActions = [
     icon: Smartphone,
     path: '/buy-data',
     gradient: 'from-blue-500 to-blue-700',
-    iconBg: 'bg-blue-50 dark:bg-blue-500/10',
+    shadow: 'shadow-blue-500/25',
   },
   {
     label: 'Airtime',
     icon: Phone,
     path: '/buy-airtime',
-    gradient: 'from-cyan-400 to-sky-600',
-    iconBg: 'bg-cyan-50 dark:bg-cyan-500/10',
+    gradient: 'from-cyan-500 to-sky-600',
+    shadow: 'shadow-cyan-500/25',
   },
   {
-    label: 'Fund Wallet',
+    label: 'Fund',
     icon: WalletIcon,
     path: '/fund-wallet',
-    gradient: 'from-emerald-400 to-green-600',
-    iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    gradient: 'from-emerald-500 to-green-600',
+    shadow: 'shadow-emerald-500/25',
   },
   {
     label: 'History',
     icon: Receipt,
     path: '/transactions',
     gradient: 'from-violet-500 to-purple-600',
-    iconBg: 'bg-violet-50 dark:bg-violet-500/10',
+    shadow: 'shadow-violet-500/25',
   },
 ];
 
@@ -68,64 +67,58 @@ const services = [
     name: 'Electricity',
     icon: Zap,
     gradient: 'from-amber-400 to-orange-500',
-    bg: 'bg-amber-50 dark:bg-amber-500/10',
   },
   {
     id: 'cable',
     name: 'Cable TV',
     icon: Tv,
     gradient: 'from-sky-400 to-blue-600',
-    bg: 'bg-sky-50 dark:bg-sky-500/10',
   },
   {
     id: 'waec',
     name: 'WAEC PIN',
     icon: GraduationCap,
     gradient: 'from-emerald-400 to-green-600',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
   },
   {
     id: 'jamb',
     name: 'JAMB PIN',
     icon: BookOpen,
     gradient: 'from-rose-400 to-red-600',
-    bg: 'bg-rose-50 dark:bg-rose-500/10',
   },
   {
     id: 'betting',
     name: 'Betting',
     icon: Trophy,
     gradient: 'from-violet-400 to-purple-600',
-    bg: 'bg-violet-50 dark:bg-violet-500/10',
   },
   {
     id: 'smile',
     name: 'Smile Data',
     icon: Smile,
     gradient: 'from-cyan-400 to-teal-600',
-    bg: 'bg-cyan-50 dark:bg-cyan-500/10',
   },
   {
     id: 'internet',
     name: 'Internet',
     icon: Wifi,
     gradient: 'from-indigo-400 to-blue-600',
-    bg: 'bg-indigo-50 dark:bg-indigo-500/10',
   },
   {
     id: 'more',
     name: 'More',
     icon: Grid3x3,
     gradient: 'from-slate-400 to-slate-600',
-    bg: 'bg-slate-100 dark:bg-slate-800',
   },
 ];
 
 const container = {
-  hidden: {},
+  hidden: { opacity: 0 },
   show: {
+    opacity: 1,
     transition: {
-      staggerChildren: 0.06,
+      staggerChildren: 0.05,
+      delayChildren: 0.08,
     },
   },
 };
@@ -133,15 +126,17 @@ const container = {
 const item = {
   hidden: {
     opacity: 0,
-    y: 12,
+    y: 10,
+    scale: 0.98,
   },
   show: {
     opacity: 1,
     y: 0,
+    scale: 1,
     transition: {
       type: 'spring' as const,
-      damping: 20,
-      stiffness: 260,
+      damping: 24,
+      stiffness: 320,
     },
   },
 };
@@ -156,243 +151,184 @@ export default function Home() {
   const firstName =
     user?.full_name?.split(' ')[0] || 'User';
 
-  /*
-   * Using the last 10 digits of the user's phone.
-   */
   const accountNumber =
     user?.phone?.slice(-10) || '0000000000';
 
-  const copyAccount = async () => {
-    try {
-      await navigator.clipboard?.writeText(
-        accountNumber
-      );
+  const copyAccount = () => {
+    navigator.clipboard?.writeText(accountNumber);
 
-      setCopied(true);
+    setCopied(true);
 
-      setTimeout(() => {
-        setCopied(false);
-      }, 1800);
-    } catch {
-      // Clipboard may be unavailable in some browsers.
-    }
+    setTimeout(() => {
+      setCopied(false);
+    }, 1800);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28">
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-[#061638] via-[#09255c] to-[#063b8f] px-5 pt-9 pb-24">
+    <div className="min-h-screen pb-24 bg-slate-50 dark:bg-slate-950">
+      {/* ================= HEADER ================= */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#07152f] via-[#0b2147] to-[#10366d] px-5 pt-7 pb-8">
         {/* Background glow */}
-        <div className="absolute -top-28 -right-24 w-80 h-80 rounded-full bg-blue-400/10 blur-3xl" />
+        <div className="absolute -top-24 -right-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
 
-        <div className="absolute -bottom-32 -left-24 w-72 h-72 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
 
-        {/* Decorative circle */}
-        <div className="absolute top-16 right-[-100px] w-64 h-64 rounded-full border border-white/5" />
-
-        {/* Small dot pattern */}
+        {/* Subtle pattern */}
         <div
-          className="absolute right-5 bottom-7 w-28 h-20 opacity-20"
+          className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage:
-              'radial-gradient(circle, white 1px, transparent 1px)',
-            backgroundSize: '10px 10px',
+              'linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
           }}
         />
 
         <motion.div
-          initial={{ opacity: 0, y: -12 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="relative z-10"
+          transition={{ duration: 0.4 }}
+          className="relative"
         >
-          {/* Top bar */}
+          {/* Top navigation */}
           <div className="flex items-center justify-between">
-            <Logo
-              size="sm"
-              showText
-            />
+            <Logo size="sm" showText />
 
             <div className="flex items-center gap-2">
-              {/* Notifications */}
               <button
                 type="button"
                 onClick={() =>
                   navigate('/notifications')
                 }
-                className="relative w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08] ring-1 ring-white/10 backdrop-blur-md transition-all active:scale-90"
               >
-                <Bell className="w-[18px] h-[18px] text-white" />
+                <Bell className="h-[18px] w-[18px] text-white" />
 
-                <span className="absolute -top-1 -right-1 min-w-[19px] h-[19px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#09255c]">
-                  3
-                </span>
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-[#0b2147]" />
               </button>
 
-              {/* Support */}
               <button
                 type="button"
-                onClick={() =>
-                  navigate('/support')
-                }
-                className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                onClick={() => navigate('/support')}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08] ring-1 ring-white/10 backdrop-blur-md transition-all active:scale-90"
               >
-                <Headphones className="w-[18px] h-[18px] text-white" />
+                <Headphones className="h-[18px] w-[18px] text-white" />
               </button>
             </div>
           </div>
 
           {/* Greeting */}
-          <div className="mt-7">
-            <p className="text-white/50 text-xs font-medium">
+          <div className="mt-6">
+            <p className="text-[11px] font-medium text-white/50">
               {getGreeting()},
             </p>
 
-            <h1 className="mt-1 text-[27px] leading-tight font-bold text-white font-display">
-              {firstName} 👋
-            </h1>
+            <div className="mt-0.5 flex items-center gap-2">
+              <h1 className="font-display text-xl font-bold text-white">
+                {firstName}
+              </h1>
 
-            <p className="mt-1 text-white/45 text-xs">
-              Manage your wallet & payments easily
-            </p>
+              <span className="text-base">👋</span>
+            </div>
           </div>
-        </motion.div>
-      </header>
 
-      {/* =====================================================
-          WALLET CARD
-      ====================================================== */}
-      <section className="relative z-20 px-5 -mt-[58px]">
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 24,
-            scale: 0.98,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-            scale: 1,
-          }}
-          transition={{
-            duration: 0.5,
-            delay: 0.08,
-          }}
-          className="relative overflow-hidden rounded-[26px] shadow-xl shadow-blue-950/25"
-        >
-          {/* Card background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0c2b68] via-[#103b86] to-[#0b4da7]" />
-
-          {/* Card glow */}
-          <div className="absolute -top-20 -right-16 w-48 h-48 rounded-full bg-blue-400/20 blur-3xl" />
-
-          <div className="absolute -bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-300/10 blur-3xl" />
-
-          {/* NFC */}
-          <Nfc className="absolute top-5 right-5 w-5 h-5 text-white/20" />
-
-          <div className="relative p-5">
-            {/* Wallet title */}
+          {/* ================= BALANCE AREA ================= */}
+          <div className="mt-6 rounded-[24px] border border-white/10 bg-white/[0.055] p-4 shadow-xl backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <WalletIcon className="w-4 h-4 text-white/60" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
+                  <WalletIcon className="h-4 w-4 text-white/70" />
+                </div>
 
-                <span className="text-xs font-medium text-white/60">
-                  Wallet Balance
-                </span>
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">
+                    Wallet Balance
+                  </p>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowBalance(
-                      !showBalance
-                    )
-                  }
-                  className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
-                >
-                  {showBalance ? (
-                    <EyeOff className="w-3.5 h-3.5 text-white/70" />
-                  ) : (
-                    <Eye className="w-3.5 h-3.5 text-white/70" />
-                  )}
-                </button>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={
+                          showBalance
+                            ? 'balance'
+                            : 'hidden'
+                        }
+                        initial={{
+                          opacity: 0,
+                          y: 5,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          y: -5,
+                        }}
+                        transition={{
+                          duration: 0.18,
+                        }}
+                        className="font-display text-2xl font-bold tracking-tight text-white"
+                      >
+                        {showBalance
+                          ? formatCurrency(
+                              user?.wallet_balance || 0
+                            )
+                          : '₦ • • • • •'}
+                      </motion.span>
+                    </AnimatePresence>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowBalance(
+                          !showBalance
+                        )
+                      }
+                      className="rounded-lg p-1.5 transition-all hover:bg-white/10 active:scale-90"
+                    >
+                      {showBalance ? (
+                        <EyeOff className="h-4 w-4 text-white/40" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-white/40" />
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Verification */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-300/10">
-                <ShieldCheck className="w-3 h-3 text-emerald-300" />
+              {/* Tier */}
+              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1">
+                <ShieldCheck className="h-3 w-3 text-emerald-400" />
 
-                <span className="text-[9px] font-bold text-emerald-100 uppercase tracking-wide">
-                  {user?.kyc_status ===
-                  'verified'
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-white/70">
+                  {user?.kyc_status === 'verified'
                     ? 'Verified'
                     : 'Tier 1'}
                 </span>
               </div>
             </div>
 
-            {/* Balance */}
-            <div className="mt-3">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={
-                    showBalance
-                      ? 'visible'
-                      : 'hidden'
-                  }
-                  initial={{
-                    opacity: 0,
-                    y: 5,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -5,
-                  }}
-                  transition={{
-                    duration: 0.18,
-                  }}
-                  className="text-white text-[31px] leading-none font-bold font-display tracking-tight"
-                >
-                  {showBalance
-                    ? formatCurrency(
-                        user?.wallet_balance ||
-                          0
-                      )
-                    : '₦ • • • • •'}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-white/10 my-4" />
-
-            {/* Account + Fund */}
-            <div className="flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[9px] uppercase tracking-widest text-white/35 mb-1">
-                  Account Number
+            {/* Account + fund */}
+            <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+              <div>
+                <p className="text-[9px] font-medium uppercase tracking-wider text-white/35">
+                  Account
                 </p>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-white text-sm font-semibold font-mono tracking-wider">
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="font-mono text-sm font-semibold tracking-wider text-white/85">
                     {accountNumber}
                   </span>
 
                   <button
                     type="button"
                     onClick={copyAccount}
-                    className="w-7 h-7 shrink-0 rounded-lg bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                    className="rounded-md bg-white/10 p-1 transition-all active:scale-90"
                   >
                     {copied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                      <Check className="h-3 w-3 text-emerald-400" />
                     ) : (
-                      <Copy className="w-3.5 h-3.5 text-white/60" />
+                      <Copy className="h-3 w-3 text-white/50" />
                     )}
                   </button>
                 </div>
@@ -400,60 +336,78 @@ export default function Home() {
 
               <motion.button
                 type="button"
-                whileTap={{
-                  scale: 0.94,
-                }}
+                whileTap={{ scale: 0.94 }}
                 onClick={() =>
                   navigate('/fund-wallet')
                 }
-                className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-[#0b3475] text-xs font-bold shadow-lg"
+                className="flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2.5 text-xs font-bold text-[#0b2147] shadow-lg"
               >
-                <Plus
-                  className="w-4 h-4"
-                  strokeWidth={2.5}
-                />
+                <Plus className="h-3.5 w-3.5" />
 
-                Fund Wallet
+                Fund
               </motion.button>
             </div>
+          </div>
+        </motion.div>
+      </section>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/10">
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-white/25" />
+      {/* ================= QUICK ACTIONS ================= */}
+      <motion.section
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="-mt-1 px-5 pt-4"
+      >
+        <div className="grid grid-cols-4 gap-2.5">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
 
-                <span className="text-[8px] text-white/25 font-medium tracking-widest">
-                  GY DATA · VIRTUAL WALLET
+            return (
+              <motion.button
+                key={action.label}
+                variants={item}
+                type="button"
+                onClick={() =>
+                  navigate(action.path)
+                }
+                whileTap={{ scale: 0.93 }}
+                className="rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div
+                  className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${action.gradient} shadow-lg ${action.shadow}`}
+                >
+                  <Icon className="h-[19px] w-[19px] text-white" />
+                </div>
+
+                <span className="mt-1.5 block text-[10px] font-semibold leading-tight text-slate-700 dark:text-slate-300">
+                  {action.label}
                 </span>
-              </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </motion.section>
 
-              <div className="flex gap-1">
-                <div className="w-5 h-3 rounded-sm bg-white/10" />
-                <div className="w-5 h-3 rounded-sm bg-white/15" />
-              </div>
-            </div>
+      {/* ================= SERVICES ================= */}
+      <section className="px-5 pt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-base font-bold text-slate-900 dark:text-white">
+              Quick Services
+            </h2>
+
+            <p className="mt-0.5 text-[10px] text-slate-400">
+              Everything you need, faster.
+            </p>
           </div>
-        </motion.div>
-      </section>
-
-      {/* =====================================================
-          QUICK ACTIONS
-      ====================================================== */}
-      <section className="px-5 mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[17px] font-bold text-slate-900 dark:text-white font-display">
-            Quick Actions
-          </h2>
 
           <button
             type="button"
-            onClick={() =>
-              navigate('/services')
-            }
-            className="text-xs font-semibold text-primary-600 dark:text-primary-400 flex items-center gap-1"
+            onClick={() => navigate('/services')}
+            className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400"
           >
             See all
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </button>
         </div>
 
@@ -463,165 +417,69 @@ export default function Home() {
           animate="show"
           className="grid grid-cols-4 gap-2.5"
         >
-          {quickActions.map(
-            (action) => {
-              const Icon = action.icon;
+          {services.map((service) => {
+            const Icon = service.icon;
+            const isMore =
+              service.id === 'more';
 
-              return (
-                <motion.button
-                  key={action.label}
-                  variants={item}
-                  type="button"
-                  whileTap={{
-                    scale: 0.94,
-                  }}
-                  onClick={() =>
-                    navigate(
-                      action.path
-                    )
-                  }
-                  className="min-w-0 rounded-[18px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-2.5 shadow-sm"
+            return (
+              <motion.button
+                key={service.id}
+                variants={item}
+                type="button"
+                onClick={() =>
+                  isMore
+                    ? navigate('/services')
+                    : navigate(
+                        `/services/${service.id}`
+                      )
+                }
+                whileTap={{ scale: 0.94 }}
+                className="group rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div
+                  className={`mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${service.gradient} shadow-md transition-transform duration-200 group-hover:scale-105`}
                 >
-                  <div
-                    className={`mx-auto w-10 h-10 rounded-[14px] ${action.iconBg} flex items-center justify-center`}
-                  >
-                    <div
-                      className={`w-9 h-9 rounded-[12px] bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-md`}
-                    >
-                      <Icon className="w-[18px] h-[18px] text-white" />
-                    </div>
-                  </div>
+                  <Icon className="h-[18px] w-[18px] text-white" />
+                </div>
 
-                  <p className="mt-2 text-[10px] font-semibold leading-tight text-slate-700 dark:text-slate-300">
-                    {action.label}
-                  </p>
-                </motion.button>
-              );
-            }
-          )}
+                <span className="mt-1.5 block truncate text-[9px] font-semibold text-slate-600 dark:text-slate-300">
+                  {service.name}
+                </span>
+              </motion.button>
+            );
+          })}
         </motion.div>
       </section>
 
-      {/* =====================================================
-          QUICK SERVICES
-      ====================================================== */}
-      <section className="px-5 mt-7">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[17px] font-bold text-slate-900 dark:text-white font-display">
-            Quick Services
-          </h2>
-
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/services')
-            }
-            className="text-xs font-semibold text-primary-600 dark:text-primary-400 flex items-center gap-1"
-          >
-            See all
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-4 gap-2.5"
+      {/* ================= BOTTOM HIGHLIGHT ================= */}
+      <section className="px-5 pt-5">
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/services')}
+          className="relative w-full overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-3.5 text-left dark:border-blue-900/40 dark:from-blue-950/40 dark:to-cyan-950/30"
         >
-          {services.map(
-            (service) => {
-              const Icon =
-                service.icon;
+          <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-400/10 blur-2xl" />
 
-              const isMore =
-                service.id ===
-                'more';
-
-              return (
-                <motion.button
-                  key={service.id}
-                  variants={item}
-                  type="button"
-                  whileTap={{
-                    scale: 0.94,
-                  }}
-                  onClick={() =>
-                    isMore
-                      ? navigate(
-                          '/services'
-                        )
-                      : navigate(
-                          `/services/${service.id}`
-                        )
-                  }
-                  className={`relative min-w-0 overflow-hidden rounded-[18px] ${service.bg} border border-slate-100 dark:border-slate-800 p-3`}
-                >
-                  {/* Small decorative glow */}
-                  <div
-                    className={`absolute -top-5 -right-5 w-14 h-14 rounded-full bg-gradient-to-br ${service.gradient} opacity-10 blur-xl`}
-                  />
-
-                  <div
-                    className={`relative mx-auto w-10 h-10 rounded-[13px] bg-gradient-to-br ${service.gradient} flex items-center justify-center shadow-sm`}
-                  >
-                    <Icon className="w-[18px] h-[18px] text-white" />
-                  </div>
-
-                  <p className="relative mt-2 text-[10px] font-semibold leading-tight text-slate-700 dark:text-slate-300">
-                    {service.name}
-                  </p>
-                </motion.button>
-              );
-            }
-          )}
-        </motion.div>
-      </section>
-
-      {/* =====================================================
-          SECURITY BANNER
-      ====================================================== */}
-      <section className="px-5 mt-6">
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 10,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            delay: 0.35,
-          }}
-          className="relative overflow-hidden rounded-[20px] bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-500/10 dark:to-cyan-500/10 border border-blue-100 dark:border-blue-500/10 p-3.5"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 shrink-0 rounded-[13px] bg-blue-500/10 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
 
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                Secure payments
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-800 dark:text-white">
+                More services available
               </p>
 
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Fast, secure and reliable
+              <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                Explore all Gy Data services.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                navigate('/support')
-              }
-              className="shrink-0 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 text-[10px] font-bold text-primary-600 dark:text-primary-400 shadow-sm"
-            >
-              Learn more
-            </button>
+            <ArrowUpRight className="h-4 w-4 text-blue-500" />
           </div>
-        </motion.div>
+        </motion.button>
       </section>
     </div>
   );
