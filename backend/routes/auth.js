@@ -26,8 +26,8 @@ function sanitizeUser(data) {
   return user;
 }
 
-/**
- * CREATE ACCOUNT
+/*
+ * REGISTER
  */
 router.post('/register', async (req, res) => {
   try {
@@ -65,11 +65,7 @@ router.post('/register', async (req, res) => {
     }
 
     /*
-     * Check whether this phone already exists.
-     *
-     * We use select + limit instead of maybeSingle()
-     * so an unexpected duplicate row does not break
-     * account verification.
+     * Check existing account.
      */
     const {
       data: existingRows,
@@ -88,8 +84,7 @@ router.post('/register', async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message:
-          'Unable to verify account. Please try again.',
+        message: 'Unable to verify account',
       });
     }
 
@@ -102,7 +97,7 @@ router.post('/register', async (req, res) => {
     }
 
     /*
-     * Create the new profile.
+     * Create account.
      */
     const { data, error } = await supabaseAdmin
       .from('profiles')
@@ -120,12 +115,11 @@ router.post('/register', async (req, res) => {
       .single();
 
     if (error) {
-      console.error('Registration error:', error);
+      console.error(
+        'Registration error:',
+        error
+      );
 
-      /*
-       * Handle duplicate phone safely even if the database
-       * has a unique constraint.
-       */
       if (
         error.code === '23505' ||
         String(error.message || '')
@@ -141,8 +135,7 @@ router.post('/register', async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        message:
-          'Unable to create account. Please try again.',
+        message: 'Unable to create account',
       });
     }
 
@@ -152,7 +145,10 @@ router.post('/register', async (req, res) => {
       user: sanitizeUser(data),
     });
   } catch (error) {
-    console.error('Register error:', error);
+    console.error(
+      'Register error:',
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -161,21 +157,26 @@ router.post('/register', async (req, res) => {
   }
 });
 
-/**
+/*
  * LOGIN
  */
 router.post('/login', async (req, res) => {
   try {
     const { phone, login_pin } = req.body;
-    const clean = cleanPhone(phone);
 
-    if (!clean || !login_pin) {
+    const clean = cleanPhone(phone);
+    const enteredPin = String(login_pin || '');
+
+    if (!clean || !enteredPin) {
       return res.status(400).json({
         success: false,
         message: 'Phone and login PIN are required',
       });
     }
 
+    /*
+     * Find account.
+     */
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
@@ -184,7 +185,10 @@ router.post('/login', async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      console.error('Login lookup error:', error);
+      console.error(
+        'Login lookup error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
@@ -192,19 +196,93 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    if (!data || data.login_pin !== hashPin(login_pin)) {
+    if (!data) {
       return res.status(401).json({
         success: false,
         message: 'Incorrect phone or PIN',
       });
     }
 
+    const storedPin = String(
+      data.login_pin || ''
+    );
+
+    let pinValid = false;
+
+    /*
+     * NEW ACCOUNTS
+     *
+     * SHA-256 hashes are 64 characters long.
+     */
+    if (storedPin.length === 64) {
+      pinValid =
+        storedPin === hashPin(enteredPin);
+    }
+
+    /*
+     * OLD ACCOUNTS
+     *
+     * Existing accounts currently have the
+     * original 6-digit PIN stored.
+     *
+     * If the PIN is correct, upgrade it to SHA-256.
+     */
+    else if (
+      storedPin.length === 6 &&
+      /^\d{6}$/.test(storedPin)
+    ) {
+      if (storedPin === enteredPin) {
+        pinValid = true;
+
+        const upgradedPin =
+          hashPin(enteredPin);
+
+        const {
+          error: upgradeError,
+        } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            login_pin: upgradedPin,
+          })
+          .eq('id', data.id);
+
+        if (upgradeError) {
+          console.error(
+            'Login PIN upgrade error:',
+            upgradeError
+          );
+
+          /*
+           * Login is still allowed because the
+           * original PIN was correct.
+           */
+        }
+      }
+    }
+
+    /*
+     * Wrong PIN.
+     */
+    if (!pinValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect phone or PIN',
+      });
+    }
+
+    /*
+     * Successful login.
+     */
     return res.json({
       success: true,
+      message: 'Login successful',
       user: sanitizeUser(data),
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error(
+      'Login error:',
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -213,12 +291,14 @@ router.post('/login', async (req, res) => {
   }
 });
 
-/**
+/*
  * GET PROFILE
  */
 router.get('/profile', async (req, res) => {
   try {
-    const clean = cleanPhone(req.query.phone);
+    const clean = cleanPhone(
+      req.query.phone
+    );
 
     if (!clean) {
       return res.status(400).json({
@@ -227,41 +307,20 @@ router.get('/profile', async (req, res) => {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('phone', clean)
-      .limit(1)
-      .maybeSingle();
+    const { data, error } =
+      await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('phone', clean)
+        .limit(1)
+        .maybeSingle();
 
     if (error) {
-      console.error('Profile lookup error:', error);
+      console.error(
+        'Profile lookup error:',
+        error
+      );
 
       return res.status(500).json({
         success: false,
-        message: 'Unable to load profile',
-      });
-    }
-
-    if (!data) {
-      return res.status(404).json({
-        success: false,
-        message: 'Account not found',
-      });
-    }
-
-    return res.json({
-      success: true,
-      user: sanitizeUser(data),
-    });
-  } catch (error) {
-    console.error('Profile error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-    });
-  }
-});
-
-module.exports = router;
+        message: 'Unable to load profile
