@@ -322,5 +322,33 @@ router.get('/profile', async (req, res) => {
       );
 
       return res.status(500).json({
-        success: false,
-        message: 'Unable to load profile
+  success: false,
+  message: 'Unable to load profile',
+});
+}
+
+if (!data) {
+  return res.status(404).json({
+    success: false,
+    message: 'Account not found',
+  });
+}
+
+return res.json({
+  success: true,
+  user: sanitizeUser(data),
+});
+} catch (error) {
+console.error(
+  'Profile error:',
+  error
+);
+
+return res.status(500).json({
+  success: false,
+  message: 'Internal server error',
+});
+}
+});
+
+module.exports = router;
