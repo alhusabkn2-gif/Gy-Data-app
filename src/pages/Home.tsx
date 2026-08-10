@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   ArrowUpRight,
   Sparkles,
-  Nfc,
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -37,28 +36,24 @@ const quickActions = [
     icon: Smartphone,
     path: '/buy-data',
     gradient: 'from-blue-500 to-blue-700',
-    iconBg: 'bg-blue-50 dark:bg-blue-500/10',
   },
   {
     label: 'Airtime',
     icon: Phone,
     path: '/buy-airtime',
-    gradient: 'from-cyan-400 to-sky-600',
-    iconBg: 'bg-cyan-50 dark:bg-cyan-500/10',
+    gradient: 'from-cyan-500 to-sky-600',
   },
   {
-    label: 'Fund Wallet',
+    label: 'Fund',
     icon: WalletIcon,
     path: '/fund-wallet',
-    gradient: 'from-emerald-400 to-green-600',
-    iconBg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    gradient: 'from-emerald-500 to-green-600',
   },
   {
     label: 'History',
     icon: Receipt,
     path: '/transactions',
     gradient: 'from-violet-500 to-purple-600',
-    iconBg: 'bg-violet-50 dark:bg-violet-500/10',
   },
 ];
 
@@ -121,27 +116,29 @@ const services = [
   },
 ];
 
-const container = {
+const quickContainer = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.06,
+      staggerChildren: 0.07,
     },
   },
 };
 
-const item = {
+const quickItem = {
   hidden: {
     opacity: 0,
     y: 12,
+    scale: 0.95,
   },
   show: {
     opacity: 1,
     y: 0,
+    scale: 1,
     transition: {
       type: 'spring' as const,
+      stiffness: 280,
       damping: 20,
-      stiffness: 260,
     },
   },
 };
@@ -156,107 +153,83 @@ export default function Home() {
   const firstName =
     user?.full_name?.split(' ')[0] || 'User';
 
-  /*
-   * Using the last 10 digits of the user's phone.
-   */
   const accountNumber =
     user?.phone?.slice(-10) || '0000000000';
 
   const copyAccount = async () => {
     try {
-      await navigator.clipboard?.writeText(
-        accountNumber
-      );
-
+      await navigator.clipboard?.writeText(accountNumber);
       setCopied(true);
 
       setTimeout(() => {
         setCopied(false);
       }, 1800);
     } catch {
-      // Clipboard may be unavailable in some browsers.
+      setCopied(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28 overflow-x-hidden">
+
       {/* =====================================================
           HEADER
       ====================================================== */}
-      <header className="relative overflow-hidden bg-gradient-to-br from-[#061638] via-[#09255c] to-[#063b8f] px-5 pt-9 pb-24">
+      <header className="relative overflow-hidden bg-gradient-to-br from-[#07152f] via-[#0b2454] to-[#0e3b78] px-5 pt-9 pb-24">
+
         {/* Background glow */}
-        <div className="absolute -top-28 -right-24 w-80 h-80 rounded-full bg-blue-400/10 blur-3xl" />
+        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-blue-400/10 blur-3xl" />
 
-        <div className="absolute -bottom-32 -left-24 w-72 h-72 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
-        {/* Decorative circle */}
-        <div className="absolute top-16 right-[-100px] w-64 h-64 rounded-full border border-white/5" />
+        {/* Small decorative circles */}
+        <div className="absolute top-16 right-16 h-2 w-2 rounded-full bg-white/20" />
+        <div className="absolute top-28 right-28 h-1.5 w-1.5 rounded-full bg-cyan-300/30" />
+        <div className="absolute bottom-12 right-10 h-1.5 w-1.5 rounded-full bg-blue-300/30" />
 
-        {/* Small dot pattern */}
-        <div
-          className="absolute right-5 bottom-7 w-28 h-20 opacity-20"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle, white 1px, transparent 1px)',
-            backgroundSize: '10px 10px',
-          }}
-        />
-
+        {/* Header content */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45 }}
-          className="relative z-10"
+          className="relative z-10 flex items-start justify-between"
         >
-          {/* Top bar */}
-          <div className="flex items-center justify-between">
-            <Logo
-              size="sm"
-              showText
-            />
+          {/* Logo + greeting */}
+          <div>
+            <Logo size="sm" showText />
 
-            <div className="flex items-center gap-2">
-              {/* Notifications */}
-              <button
-                type="button"
-                onClick={() =>
-                  navigate('/notifications')
-                }
-                className="relative w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <Bell className="w-[18px] h-[18px] text-white" />
+            <div className="mt-4">
+              <p className="text-[11px] font-medium text-white/50">
+                {getGreeting()},
+              </p>
 
-                <span className="absolute -top-1 -right-1 min-w-[19px] h-[19px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#09255c]">
-                  3
-                </span>
-              </button>
-
-              {/* Support */}
-              <button
-                type="button"
-                onClick={() =>
-                  navigate('/support')
-                }
-                className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-transform"
-              >
-                <Headphones className="w-[18px] h-[18px] text-white" />
-              </button>
+              <h1 className="mt-0.5 text-xl font-bold text-white font-display">
+                {firstName} 👋
+              </h1>
             </div>
           </div>
 
-          {/* Greeting */}
-          <div className="mt-7">
-            <p className="text-white/50 text-xs font-medium">
-              {getGreeting()},
-            </p>
+          {/* Header buttons */}
+          <div className="flex items-center gap-2">
 
-            <h1 className="mt-1 text-[27px] leading-tight font-bold text-white font-display">
-              {firstName} 👋
-            </h1>
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 backdrop-blur-md transition active:scale-90"
+            >
+              <Bell className="h-[18px] w-[18px] text-white" />
 
-            <p className="mt-1 text-white/45 text-xs">
-              Manage your wallet & payments easily
-            </p>
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-[#0b2454]" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/support')}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 backdrop-blur-md transition active:scale-90"
+            >
+              <Headphones className="h-[18px] w-[18px] text-white" />
+            </button>
+
           </div>
         </motion.div>
       </header>
@@ -264,12 +237,13 @@ export default function Home() {
       {/* =====================================================
           WALLET CARD
       ====================================================== */}
-      <section className="relative z-20 px-5 -mt-[58px]">
+      <section className="relative z-20 -mt-16 px-5">
+
         <motion.div
           initial={{
             opacity: 0,
             y: 24,
-            scale: 0.98,
+            scale: 0.97,
           }}
           animate={{
             opacity: 1,
@@ -280,10 +254,33 @@ export default function Home() {
             duration: 0.5,
             delay: 0.08,
           }}
-          className="relative overflow-hidden rounded-[26px] shadow-xl shadow-blue-950/25"
+          className="relative overflow-hidden rounded-[24px] shadow-xl shadow-slate-900/20"
         >
+
           {/* Card background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0c2b68] via-[#103b86] to-[#0b4da7]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#071426] via-[#0b2854] to-[#0d478b]" />
 
           {/* Card glow */}
-          <div className="absolute -top-20 -right-16 w-48 h-48 rounded-full bg-blue
+          <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-400/15 blur-3xl" />
+
+          <div className="absolute -bottom-20 -left-10 h-36 w-36 rounded-full bg-cyan-400/10 blur-3xl" />
+
+          {/* Top shine */}
+          <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+          <div className="relative p-5">
+
+            {/* Wallet heading */}
+            <div className="flex items-center justify-between">
+
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
+                  <WalletIcon className="h-4 w-4 text-white/70" />
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">
+                    Wallet Balance
+                  </p>
+
+                  <div className="mt-
