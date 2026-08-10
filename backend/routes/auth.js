@@ -26,6 +26,9 @@ function sanitizeUser(data) {
   return user;
 }
 
+/**
+ * CREATE ACCOUNT
+ */
 router.post('/register', async (req, res) => {
   try {
     const {
@@ -61,38 +64,55 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const { data: existing, error: existingError } =
-      await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('phone', clean)
-        .maybeSingle();
+    /*
+     * Check whether this phone already exists.
+     *
+     * We use select + limit instead of maybeSingle()
+     * so an unexpected duplicate row does not break
+     * account verification.
+     */
+    const {
+      data: existingRows,
+      error: existingError,
+    } = await supabaseAdmin
+      .from('profiles')
+      .select('id, phone')
+      .eq('phone', clean)
+      .limit(1);
 
     if (existingError) {
       console.error(
         'Existing account check error:',
-        existingError.message
+        existingError
       );
 
       return res.status(500).json({
         success: false,
-        message: 'Unable to verify account',
+        message:
+          'Unable to verify account. Please try again.',
       });
     }
 
-    if (existing) {
+    if (existingRows && existingRows.length > 0) {
       return res.status(409).json({
         success: false,
-        message: 'Phone number already registered',
+        message:
+          'Phone number already registered. Please login instead.',
       });
     }
 
+    /*
+     * Create the new profile.
+     */
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .insert({
         full_name: String(full_name).trim(),
         phone: clean,
         email: email ? String(email).trim() : null,
+        referral_code: referral_code
+          ? String(referral_code).trim()
+          : null,
         login_pin: hashPin(login_pin),
         purchase_pin: hashPin(purchase_pin),
       })
@@ -100,26 +120,39 @@ router.post('/register', async (req, res) => {
       .single();
 
     if (error) {
-      console.error(
-        'Registration error:',
-        error.message
-      );
+      console.error('Registration error:', error);
+
+      /*
+       * Handle duplicate phone safely even if the database
+       * has a unique constraint.
+       */
+      if (
+        error.code === '23505' ||
+        String(error.message || '')
+          .toLowerCase()
+          .includes('duplicate')
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            'Phone number already registered. Please login instead.',
+        });
+      }
 
       return res.status(500).json({
         success: false,
-        message: 'Unable to create account',
+        message:
+          'Unable to create account. Please try again.',
       });
     }
 
     return res.status(201).json({
       success: true,
+      message: 'Account created successfully',
       user: sanitizeUser(data),
     });
   } catch (error) {
-    console.error(
-      'Register error:',
-      error.message
-    );
+    console.error('Register error:', error);
 
     return res.status(500).json({
       success: false,
@@ -128,6 +161,9 @@ router.post('/register', async (req, res) => {
   }
 });
 
+/**
+ * LOGIN
+ */
 router.post('/login', async (req, res) => {
   try {
     const { phone, login_pin } = req.body;
@@ -144,13 +180,11 @@ router.post('/login', async (req, res) => {
       .from('profiles')
       .select('*')
       .eq('phone', clean)
+      .limit(1)
       .maybeSingle();
 
     if (error) {
-      console.error(
-        'Login lookup error:',
-        error.message
-      );
+      console.error('Login lookup error:', error);
 
       return res.status(500).json({
         success: false,
@@ -170,10 +204,7 @@ router.post('/login', async (req, res) => {
       user: sanitizeUser(data),
     });
   } catch (error) {
-    console.error(
-      'Login error:',
-      error.message
-    );
+    console.error('Login error:', error);
 
     return res.status(500).json({
       success: false,
@@ -182,6 +213,9 @@ router.post('/login', async (req, res) => {
   }
 });
 
+/**
+ * GET PROFILE
+ */
 router.get('/profile', async (req, res) => {
   try {
     const clean = cleanPhone(req.query.phone);
@@ -197,13 +231,11 @@ router.get('/profile', async (req, res) => {
       .from('profiles')
       .select('*')
       .eq('phone', clean)
+      .limit(1)
       .maybeSingle();
 
     if (error) {
-      console.error(
-        'Profile lookup error:',
-        error.message
-      );
+      console.error('Profile lookup error:', error);
 
       return res.status(500).json({
         success: false,
@@ -223,10 +255,7 @@ router.get('/profile', async (req, res) => {
       user: sanitizeUser(data),
     });
   } catch (error) {
-    console.error(
-      'Profile error:',
-      error.message
-    );
+    console.error('Profile error:', error);
 
     return res.status(500).json({
       success: false,
