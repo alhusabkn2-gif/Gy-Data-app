@@ -34,6 +34,7 @@ import Wallet from './pages/Wallet';
 import Settings from './pages/Settings';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
+import SuperAdminDashboard from './pages/super-admin/SuperAdminDashboard';
 
 const SUPER_ADMIN_SESSION = 'gydata_super_admin_session';
 
@@ -94,7 +95,9 @@ function AppRoutes() {
     <>
       <Routes>
 
-        {/* Authentication */}
+        {/* =========================
+            AUTHENTICATION
+        ========================== */}
 
         <Route
           path="/login"
@@ -106,28 +109,27 @@ function AppRoutes() {
           element={<Register />}
         />
 
-        {/* Super Admin Login */}
+        {/* =========================
+            SUPER ADMIN
+        ========================== */}
 
         <Route
           path="/super-admin-login"
           element={<SuperAdminLogin />}
         />
 
-        {/* Super Admin - dashboard will be added next */}
-
         <Route
           path="/super-admin"
           element={
             <SuperAdminRoute>
-              <Navigate
-                to="/super-admin-login"
-                replace
-              />
+              <SuperAdminDashboard />
             </SuperAdminRoute>
           }
         />
 
-        {/* Main Home */}
+        {/* =========================
+            USER HOME
+        ========================== */}
 
         <Route
           path="/"
@@ -138,7 +140,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Services */}
+        {/* =========================
+            SERVICES
+        ========================== */}
 
         <Route
           path="/services"
@@ -176,7 +180,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Service Pages */}
+        {/* =========================
+            SERVICE PAGES
+        ========================== */}
 
         <Route
           path="/services/electricity"
@@ -241,7 +247,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Wallet */}
+        {/* =========================
+            WALLET
+        ========================== */}
 
         <Route
           path="/fund-wallet"
@@ -261,7 +269,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Transactions */}
+        {/* =========================
+            TRANSACTIONS
+        ========================== */}
 
         <Route
           path="/transactions"
@@ -281,7 +291,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Account */}
+        {/* =========================
+            ACCOUNT
+        ========================== */}
 
         <Route
           path="/profile"
@@ -319,7 +331,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Normal Admin */}
+        {/* =========================
+            NORMAL ADMIN
+        ========================== */}
 
         <Route
           path="/admin"
@@ -330,7 +344,9 @@ function AppRoutes() {
           }
         />
 
-        {/* Unknown route */}
+        {/* =========================
+            FALLBACK
+        ========================== */}
 
         <Route
           path="*"
