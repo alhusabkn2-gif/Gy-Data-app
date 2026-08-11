@@ -1,16 +1,7 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import type { ReactNode } from 'react';
 
-import {
-  AuthProvider,
-  useAuth,
-} from './contexts/AuthContext';
-
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
 import BottomNav from './components/BottomNav';
@@ -43,9 +34,6 @@ import Wallet from './pages/Wallet';
 import Settings from './pages/Settings';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
-import Adminlogs from './pages/admin/Adminlogs';
-
-import type { ReactNode } from 'react';
 
 const SUPER_ADMIN_SESSION = 'gydata_super_admin_session';
 
@@ -72,17 +60,10 @@ function SuperAdminRoute({
 }: {
   children: ReactNode;
 }) {
-  const session = localStorage.getItem(
-    SUPER_ADMIN_SESSION
-  );
+  const session = localStorage.getItem(SUPER_ADMIN_SESSION);
 
   if (session !== 'true') {
-    return (
-      <Navigate
-        to="/super-admin-login"
-        replace
-      />
-    );
+    return <Navigate to="/super-admin-login" replace />;
   }
 
   return <>{children}</>;
@@ -105,7 +86,6 @@ function AppRoutes() {
 
   const showBottomNav =
     !!user &&
-    !user.is_admin &&
     !isAuthPage &&
     !isAdminPage &&
     !isSuperAdminPage;
@@ -114,9 +94,7 @@ function AppRoutes() {
     <>
       <Routes>
 
-        {/* =========================
-            AUTHENTICATION
-        ========================== */}
+        {/* Authentication */}
 
         <Route
           path="/login"
@@ -128,27 +106,28 @@ function AppRoutes() {
           element={<Register />}
         />
 
-        {/* =========================
-            SUPER ADMIN
-        ========================== */}
+        {/* Super Admin Login */}
 
         <Route
           path="/super-admin-login"
           element={<SuperAdminLogin />}
         />
 
+        {/* Super Admin - dashboard will be added next */}
+
         <Route
           path="/super-admin"
           element={
             <SuperAdminRoute>
-              <Adminlogs />
+              <Navigate
+                to="/super-admin-login"
+                replace
+              />
             </SuperAdminRoute>
           }
         />
 
-        {/* =========================
-            USER HOME
-        ========================== */}
+        {/* Main Home */}
 
         <Route
           path="/"
@@ -159,9 +138,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            SERVICES
-        ========================== */}
+        {/* Services */}
 
         <Route
           path="/services"
@@ -199,9 +176,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            SERVICE PAGES
-        ========================== */}
+        {/* Service Pages */}
 
         <Route
           path="/services/electricity"
@@ -266,9 +241,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            WALLET
-        ========================== */}
+        {/* Wallet */}
 
         <Route
           path="/fund-wallet"
@@ -288,9 +261,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            TRANSACTIONS
-        ========================== */}
+        {/* Transactions */}
 
         <Route
           path="/transactions"
@@ -310,9 +281,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            USER ACCOUNT
-        ========================== */}
+        {/* Account */}
 
         <Route
           path="/profile"
@@ -350,9 +319,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            NORMAL ADMIN
-        ========================== */}
+        {/* Normal Admin */}
 
         <Route
           path="/admin"
@@ -363,9 +330,7 @@ function AppRoutes() {
           }
         />
 
-        {/* =========================
-            FALLBACK
-        ========================== */}
+        {/* Unknown route */}
 
         <Route
           path="*"
