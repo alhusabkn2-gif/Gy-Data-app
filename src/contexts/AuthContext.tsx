@@ -23,9 +23,15 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  superAdmin: boolean;
   login: (phone: string, pin: string) => Promise<{ error: string | null }>;
+  loginSuperAdmin: (
+    email: string,
+    pin: string
+  ) => Promise<{ error: string | null }>;
   register: (data: RegisterData) => Promise<{ error: string | null }>;
   logout: () => void;
+  logoutSuperAdmin: () => void;
   refreshUser: () => Promise<void>;
   updateWalletBalance: (balance: number) => void;
 }
@@ -42,12 +48,17 @@ interface RegisterData {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'gydata_session';
+const SUPER_ADMIN_KEY = 'gydata_super_admin';
 
 const API_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:10000';
 
+const SUPER_ADMIN_EMAIL = 'sadmin@gyd.com';
+const SUPER_ADMIN_PIN = '1251';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [superAdmin, setSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const saveSession = (profile: UserProfile) => {
@@ -62,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+      const storedSuperAdmin = localStorage.getItem(SUPER_ADMIN_KEY);
 
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -70,8 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(parsed.user);
         }
       }
+
+      if (storedSuperAdmin === 'true') {
+        setSuperAdmin(true);
+      }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SUPER_ADMIN_KEY);
+      setUser(null);
+      setSuperAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -98,6 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      setSuperAdmin(false);
+      localStorage.removeItem(SUPER_ADMIN_KEY);
+
       saveSession(result.user);
 
       return { error: null };
@@ -108,6 +130,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: 'Unable to connect to server.',
       };
     }
+  };
+
+  const loginSuperAdmin = async (
+    email: string,
+    pin: string
+  ) => {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (
+      cleanEmail !== SUPER_ADMIN_EMAIL ||
+      pin !== SUPER_ADMIN_PIN
+    ) {
+      return {
+        error: 'Invalid Super Admin email or PIN.',
+      };
+    }
+
+    setSuperAdmin(true);
+    setUser(null);
+
+    localStorage.setItem(SUPER_ADMIN_KEY, 'true');
+    localStorage.removeItem(STORAGE_KEY);
+
+    return { error: null };
   };
 
   const register = async (regData: RegisterData) => {
@@ -134,6 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error: result.message || 'Registration failed.',
         };
       }
+
+      setSuperAdmin(false);
+      localStorage.removeItem(SUPER_ADMIN_KEY);
 
       saveSession(result.user);
 
@@ -169,6 +218,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   };
 
+  const logoutSuperAdmin = () => {
+    setSuperAdmin(false);
+    localStorage.removeItem(SUPER_ADMIN_KEY);
+  };
+
   const updateWalletBalance = (balance: number) => {
     setUser((prev) => {
       if (!prev) return prev;
@@ -192,9 +246,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
+        superAdmin,
         login,
+        loginSuperAdmin,
         register,
         logout,
+        logoutSuperAdmin,
         refreshUser,
         updateWalletBalance,
       }}
