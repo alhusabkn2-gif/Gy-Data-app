@@ -1010,4 +1010,59 @@ function OverviewSection({
               Executive Actions
             </h3>
             <p className="mt-1 text-xs text-slate-400">
-              Direct access to high-level operations
+  Direct access to high-level operations
+</p>
+</div>
+</div>
+</div>
+);
+}
+
+function StatusRow({
+label,
+value,
+}: {
+label: string;
+value: string;
+}) {
+return (
+<div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+<span className="text-sm font-semibold text-slate-600">{label}</span>
+<span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600">
+{value}
+</span>
+</div>
+);
+}
+
+function Alert({
+title,
+detail,
+onClick,
+}: {
+title: string;
+detail: string;
+onClick: () => void;
+}) {
+return (
+<button
+type="button"
+onClick={onClick}
+className="flex w-full items-start gap-3 rounded-2xl border border-slate-100 p-4 text-left hover:bg-blue-50"
+>
+<Bell className="mt-1 h-4 w-4 shrink-0 text-blue-600" />
+
+<span className="flex-1">
+<span className="block text-sm font-bold text-slate-800">
+{title}
+</span>
+
+<span className="mt-1 block text-xs leading-5 text-slate-400">
+{detail}
+</span>
+</span>
+
+<ChevronRight className="mt-1 h-4 w-4 text-slate-300" />
+</button>
+);
+}
