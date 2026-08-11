@@ -398,8 +398,6 @@ function SecretCircle({
       {secret ? null : null}
     </button>
   );
-}
-
-Abin da wannan ya yi: sama-hagu da ƙasa-dama suna da subtle spherical appearance, yayin da circles ɗin ba sa nuna wani tap feedback. Secret ɗin yana buɗe Super Admin ne kawai bayan an riƙe shi na 2 seconds.
+}s.
 
 Bayan ka manna: Save → Commit → Push → Render build.
