@@ -1,1 +1,1416 @@
+import { useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpRight,
+  BarChart3,
+  Bell,
+  ChevronRight,
+  CreditCard,
+  Database,
+  LogOut,
+  Menu,
+  Search,
+  Settings,
+  ShieldCheck,
+  UserCheck,
+  UserX,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 
+const SESSION_KEY = 'gydata_super_admin_session';
+
+type Section =
+  | 'overview'
+  | 'users'
+  | 'wallet'
+  | 'transactions'
+  | 'revenue'
+  | 'funding'
+  | 'admins'
+  | 'security'
+  | 'notifications'
+  | 'settings';
+
+const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
+  { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'users', label: 'Users Management', icon: Users },
+  { id: 'wallet', label: 'Wallet / Manual Funding', icon: Wallet },
+  { id: 'transactions', label: 'Transactions', icon: CreditCard },
+  { id: 'revenue', label: 'Revenue / Statistics', icon: ArrowUpRight },
+  { id: 'funding', label: 'Funding Accounts', icon: ArrowDownToLine },
+  { id: 'admins', label: 'Admin Management', icon: ShieldCheck },
+  { id: 'security', label: 'Security / Activity Logs', icon: Activity },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'settings', label: 'System Settings', icon: Settings },
+];
+
+const titles: Record<Section, string> = {
+  overview: 'Executive Overview',
+  users: 'Users Management',
+  wallet: 'Wallet & Manual Funding',
+  transactions: 'Transactions',
+  revenue: 'Revenue & Statistics',
+  funding: 'Funding Accounts',
+  admins: 'Admin Management',
+  security: 'Security & Activity Logs',
+  notifications: 'Notifications',
+  settings: 'System Settings',
+};
+
+export default function SuperAdminDashboard() {
+  const navigate = useNavigate();
+  const [section, setSection] = useState<Section>('overview');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const open = (next: Section) => {
+    setSection(next);
+    setMenuOpen(false);
+    setSearch('');
+  };
+
+  const message = (text: string) => {
+    setNotice(text);
+    window.setTimeout(() => setNotice(''), 2600);
+  };
+
+  const logout = () => {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('gydata_super_admin');
+    navigate('/super-admin-login', { replace: true });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f4f7fc] text-slate-800">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#04102f] text-white shadow-2xl transition-transform duration-300 ${
+          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
+        <div className="flex h-full flex-col">
+          <div className="border-b border-white/10 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500">
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">
+                  GY Data
+                </p>
+                <h1 className="text-lg font-bold">Executive Office</h1>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 lg:hidden"
+                aria-label="Close menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto p-3">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+              Control Center
+            </p>
+
+            <div className="space-y-1">
+              {sections.map((item) => {
+                const Icon = item.icon;
+                const active = section === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => open(item.id)}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition ${
+                      active
+                        ? 'bg-blue-500 text-white'
+                        : 'text-white/65 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="flex-1">{item.label}</span>
+                    {active && <ChevronRight className="h-4 w-4" />}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+
+          <div className="border-t border-white/10 p-3">
+            <button
+              type="button"
+              onClick={logout}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-red-300 transition hover:bg-red-500/10"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {menuOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+        />
+      )}
+
+      <div className="lg:pl-[280px]">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
+          <div className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 lg:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                Super Admin Control Center
+              </p>
+
+              <h2 className="truncate text-lg font-bold text-[#07143d]">
+                {titles[section]}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => open('notifications')}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 hover:bg-blue-50"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+            </button>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="hidden items-center gap-2 rounded-xl bg-red-50 px-3 py-2.5 text-sm font-bold text-red-600 sm:flex"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+          <motion.div
+            key={section}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-5"
+          >
+            <div>
+              <p className="text-xs font-bold text-blue-600">Executive Office</p>
+
+              <h1 className="mt-1 text-2xl font-bold text-[#07143d] sm:text-3xl">
+                {titles[section]}
+              </h1>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Highest-level GY Data platform control and management.
+              </p>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={`Search ${titles[section].toLowerCase()}...`}
+                className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              />
+            </div>
+
+            {notice && (
+              <button
+                type="button"
+                onClick={() => setNotice('')}
+                className="w-full rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-left text-sm font-semibold text-blue-700"
+              >
+                {notice}
+              </button>
+            )}
+
+            {section === 'overview' && (
+              <Overview
+                onOpen={open}
+                onMessage={message}
+              />
+            )}
+
+            {section === 'users' && (
+              <UsersSection
+                search={search}
+                onMessage={message}
+              />
+            )}
+
+            {section === 'wallet' && (
+              <WalletSection onMessage={message} />
+            )}
+
+            {section === 'transactions' && (
+              <TransactionsSection
+                search={search}
+                onMessage={message}
+              />
+            )}
+
+            {section === 'revenue' && (
+              <RevenueSection onMessage={message} />
+            )}
+
+            {section === 'funding' && (
+              <FundingSection onMessage={message} />
+            )}
+
+            {section === 'admins' && (
+              <AdminsSection onMessage={message} />
+            )}
+
+            {section === 'security' && (
+              <SecuritySection
+                search={search}
+                onMessage={message}
+              />
+            )}
+
+            {section === 'notifications' && (
+              <NotificationsSection onMessage={message} />
+            )}
+
+            {section === 'settings' && (
+              <SettingsSection onMessage={message} />
+            )}
+          </motion.div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function Overview({
+  onOpen,
+  onMessage,
+}: {
+  onOpen: (section: Section) => void;
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Total Users"
+          value="2,486"
+          detail="+12.8% this month"
+          icon={Users}
+          onClick={() => onOpen('users')}
+        />
+
+        <StatCard
+          title="Wallet Funding"
+          value="₦8.42M"
+          detail="Manual funding"
+          icon={Wallet}
+          onClick={() => onOpen('wallet')}
+        />
+
+        <StatCard
+          title="Transactions"
+          value="14,892"
+          detail="Platform activity"
+          icon={CreditCard}
+          onClick={() => onOpen('transactions')}
+        />
+
+        <StatCard
+          title="Revenue"
+          value="₦1.27M"
+          detail="+8.4% this month"
+          icon={ArrowUpRight}
+          onClick={() => onOpen('revenue')}
+        />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
+        <Panel
+          title="Executive Actions"
+          subtitle="Direct access to high-level operations"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ActionButton
+              icon={Users}
+              title="Manage Users"
+              description="Search, suspend or activate users"
+              onClick={() => onOpen('users')}
+            />
+
+            <ActionButton
+              icon={Wallet}
+              title="Review Funding"
+              description="Review manual wallet funding"
+              onClick={() => onOpen('wallet')}
+            />
+
+            <ActionButton
+              icon={ShieldCheck}
+              title="Admin Management"
+              description="Manage privileged accounts"
+              onClick={() => onOpen('admins')}
+            />
+
+            <ActionButton
+              icon={Activity}
+              title="Security Logs"
+              description="Review important platform activity"
+              onClick={() => onOpen('security')}
+            />
+          </div>
+        </Panel>
+
+        <Panel
+          title="System Status"
+          subtitle="Current control-center health"
+        >
+          <div className="space-y-3">
+            <StatusRow label="Platform" value="Operational" />
+            <StatusRow label="Wallet System" value="Operational" />
+            <StatusRow label="Manual Funding" value="Active" />
+            <StatusRow label="Security" value="Protected" />
+          </div>
+        </Panel>
+      </div>
+
+      <Panel
+        title="Priority Alerts"
+        subtitle="Items that may require attention"
+      >
+        <div className="space-y-3">
+          <Alert
+            title="Manual funding review"
+            detail="Funding records are ready for administrative review."
+            onClick={() => onOpen('wallet')}
+          />
+
+          <Alert
+            title="User activity"
+            detail="Review recent account activity and account status."
+            onClick={() => onOpen('users')}
+          />
+
+          <Alert
+            title="Security activity"
+            detail="Open the activity log to inspect privileged actions."
+            onClick={() => onOpen('security')}
+          />
+        </div>
+      </Panel>
+
+      <button
+        type="button"
+        onClick={() => onMessage('Executive dashboard refreshed.')}
+        className="rounded-2xl bg-[#07143d] px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+      >
+        Refresh Executive Overview
+      </button>
+    </>
+  );
+}
+
+function UsersSection({
+  search,
+  onMessage,
+}: {
+  search: string;
+  onMessage: (text: string) => void;
+}) {
+  const users = [
+    { name: 'Aisha Musa', phone: '0803•••4412', status: 'Active' },
+    { name: 'Abdul Karim', phone: '0814•••0921', status: 'Active' },
+    { name: 'Sani Ibrahim', phone: '0706•••3378', status: 'Suspended' },
+    { name: 'Fatima Bello', phone: '0902•••6154', status: 'Active' },
+  ];
+
+  const filtered = users.filter((user) =>
+    `${user.name} ${user.phone} ${user.status}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  return (
+    <Panel
+      title="Users Management"
+      subtitle="Search and manage platform users"
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[650px] text-left">
+          <thead>
+            <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
+              <th className="px-3 py-3">User</th>
+              <th className="px-3 py-3">Phone</th>
+              <th className="px-3 py-3">Status</th>
+              <th className="px-3 py-3 text-right">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filtered.map((user) => (
+              <tr
+                key={user.phone}
+                className="border-b border-slate-50"
+              >
+                <td className="px-3 py-4">
+                  <p className="font-bold text-slate-800">{user.name}</p>
+                  <p className="text-xs text-slate-400">GY Data account</p>
+                </td>
+
+                <td className="px-3 py-4 text-sm text-slate-500">
+                  {user.phone}
+                </td>
+
+                <td className="px-3 py-4">
+                  <span
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                      user.status === 'Active'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-red-50 text-red-600'
+                    }`}
+                  >
+                    {user.status}
+                  </span>
+                </td>
+
+                <td className="px-3 py-4 text-right">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onMessage(
+                        `${user.name}: user action panel is ready for backend connection.`,
+                      )
+                    }
+                    className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-100"
+                  >
+                    Manage
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="py-10 text-center text-sm text-slate-400">
+          No users matched your search.
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => onMessage('User suspension workflow opened.')}
+          className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600"
+        >
+          <UserX className="h-4 w-4" />
+          Suspend User
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onMessage('User activation workflow opened.')}
+          className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-600"
+        >
+          <UserCheck className="h-4 w-4" />
+          Activate User
+        </button>
+      </div>
+    </Panel>
+  );
+}
+
+function WalletSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <InfoCard
+          title="Manual Funding"
+          value="Active"
+          detail="PalmPay transfer funding"
+          icon={Wallet}
+        />
+
+        <InfoCard
+          title="Pending Reviews"
+          value="18"
+          detail="Funding records awaiting review"
+          icon={Activity}
+        />
+
+        <InfoCard
+          title="Today's Funding"
+          value="₦482,500"
+          detail="Manual deposits recorded"
+          icon={ArrowDownToLine}
+        />
+      </div>
+
+      <Panel
+        title="Manual Funding Account"
+        subtitle="Official GY Data funding account"
+      >
+        <div className="rounded-3xl bg-[#07143d] p-5 text-white">
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">
+            PalmPay
+          </p>
+
+          <p className="mt-3 text-2xl font-bold tracking-wider">
+            9550627002
+          </p>
+
+          <p className="mt-1 text-sm text-white/60">
+            Abdurrahman Yahaya Ibrahim
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                onMessage('PalmPay account number copied.')
+              }
+              className="rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#07143d]"
+            >
+              Copy Account Number
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onMessage('Funding review page opened.')
+              }
+              className="rounded-xl bg-blue-500 px-4 py-2.5 text-xs font-bold text-white"
+            >
+              Review Funding
+            </button>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel
+        title="Funding Controls"
+        subtitle="Administrative actions"
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <ActionButton
+            icon={Activity}
+            title="Pending Funding"
+            description="Review pending records"
+            onClick={() =>
+              onMessage('Pending funding records opened.')
+            }
+          />
+
+          <ActionButton
+            icon={Database}
+            title="Funding History"
+            description="View funding records"
+            onClick={() =>
+              onMessage('Funding history opened.')
+            }
+          />
+
+          <ActionButton
+            icon={Settings}
+            title="Funding Settings"
+            description="Configure funding rules"
+            onClick={() =>
+              onMessage('Funding settings opened.')
+            }
+          />
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+function TransactionsSection({
+  search,
+  onMessage,
+}: {
+  search: string;
+  onMessage: (text: string) => void;
+}) {
+  const transactions = [
+    { id: 'TXN-10021', type: 'Wallet Funding', amount: '₦25,000', status: 'Pending' },
+    { id: 'TXN-10020', type: 'Data Purchase', amount: '₦3,500', status: 'Successful' },
+    { id: 'TXN-10019', type: 'Airtime', amount: '₦5,000', status: 'Successful' },
+    { id: 'TXN-10018', type: 'Wallet Funding', amount: '₦50,000', status: 'Successful' },
+  ];
+
+  const filtered = transactions.filter((transaction) =>
+    `${transaction.id} ${transaction.type} ${transaction.amount} ${transaction.status}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  return (
+    <Panel
+      title="Transactions"
+      subtitle="Platform-wide transaction activity"
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-left">
+          <thead>
+            <tr className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-400">
+              <th className="px-3 py-3">Reference</th>
+              <th className="px-3 py-3">Type</th>
+              <th className="px-3 py-3">Amount</th>
+              <th className="px-3 py-3">Status</th>
+              <th className="px-3 py-3 text-right">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filtered.map((transaction) => (
+              <tr
+                key={transaction.id}
+                className="border-b border-slate-50"
+              >
+                <td className="px-3 py-4 text-sm font-bold text-slate-700">
+                  {transaction.id}
+                </td>
+
+                <td className="px-3 py-4 text-sm text-slate-500">
+                  {transaction.type}
+                </td>
+
+                <td className="px-3 py-4 text-sm font-bold text-slate-800">
+                  {transaction.amount}
+                </td>
+
+                <td className="px-3 py-4">
+                  <span
+                    className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                      transaction.status === 'Successful'
+                        ? 'bg-emerald-50 text-emerald-600'
+                        : 'bg-amber-50 text-amber-600'
+                    }`}
+                  >
+                    {transaction.status}
+                  </span>
+                </td>
+
+                <td className="px-3 py-4 text-right">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onMessage(
+                        `${transaction.id} transaction details opened.`,
+                      )
+                    }
+                    className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200"
+                  >
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => onMessage('Transaction export prepared.')}
+          className="rounded-xl bg-[#07143d] px-4 py-2.5 text-xs font-bold text-white"
+        >
+          Export Transactions
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onMessage('Transaction filters opened.')}
+          className="rounded-xl bg-blue-50 px-4 py-2.5 text-xs font-bold text-blue-600"
+        >
+          Advanced Filters
+        </button>
+      </div>
+    </Panel>
+  );
+}
+
+function RevenueSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoCard
+          title="Monthly Revenue"
+          value="₦1.27M"
+          detail="+8.4% from previous month"
+          icon={ArrowUpRight}
+        />
+
+        <InfoCard
+          title="Data Services"
+          value="₦690K"
+          detail="Largest revenue category"
+          icon={BarChart3}
+        />
+
+        <InfoCard
+          title="Airtime Services"
+          value="₦310K"
+          detail="Current period"
+          icon={CreditCard}
+        />
+
+        <InfoCard
+          title="Other Services"
+          value="₦270K"
+          detail="Current period"
+          icon={Database}
+        />
+      </div>
+
+      <Panel
+        title="Revenue Overview"
+        subtitle="Executive statistics"
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <MetricBlock label="Today" value="₦48,250" />
+          <MetricBlock label="This Week" value="₦284,600" />
+          <MetricBlock label="This Month" value="₦1,270,000" />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onMessage('Revenue report opened.')}
+          className="mt-5 rounded-xl bg-[#07143d] px-4 py-2.5 text-xs font-bold text-white"
+        >
+          Open Detailed Revenue Report
+        </button>
+      </Panel>
+    </>
+  );
+}
+
+function FundingSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <Panel
+      title="Funding Accounts"
+      subtitle="Accounts used for manual platform funding"
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+              <Wallet className="h-5 w-5" />
+            </div>
+
+            <div>
+              <p className="font-bold text-slate-800">PalmPay</p>
+              <p className="text-xs text-slate-400">Primary funding account</p>
+            </div>
+          </div>
+
+          <p className="mt-5 text-xl font-bold text-[#07143d]">
+            9550627002
+          </p>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Abdurrahman Yahaya Ibrahim
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              onMessage('Funding account management opened.')
+            }
+            className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white"
+          >
+            Manage Account
+          </button>
+        </div>
+
+        <div className="rounded-3xl border border-dashed border-slate-200 p-5">
+          <p className="font-bold text-slate-800">Additional Funding Account</p>
+          <p className="mt-1 text-sm text-slate-400">
+            Structure ready for another approved funding account.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => onMessage('Add funding account workflow opened.')}
+            className="mt-5 rounded-xl bg-[#07143d] px-4 py-2.5 text-xs font-bold text-white"
+          >
+            Add Account
+          </button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function AdminsSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <>
+      <Panel
+        title="Admin Management"
+        subtitle="Manage privileged administrative access"
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <AdminCard
+            name="Super Admin"
+            role="Highest Privilege"
+            status="Active"
+            onClick={() =>
+              onMessage('Super Admin security profile opened.')
+            }
+          />
+
+          <AdminCard
+            name="Normal Admin"
+            role="Platform Administration"
+            status="Not Configured"
+            onClick={() =>
+              onMessage(
+                'Normal Admin management is ready for the next development stage.',
+              )
+            }
+          />
+        </div>
+      </Panel>
+
+      <Panel
+        title="Administrative Actions"
+        subtitle="Security-sensitive operations"
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <ActionButton
+            icon={UserCheck}
+            title="Add Admin"
+            description="Create privileged account"
+            onClick={() => onMessage('Add admin workflow opened.')}
+          />
+
+          <ActionButton
+            icon={ShieldCheck}
+            title="Permissions"
+            description="Review admin permissions"
+            onClick={() =>
+              onMessage('Admin permissions opened.')
+            }
+          />
+
+          <ActionButton
+            icon={Activity}
+            title="Admin Activity"
+            description="Review privileged actions"
+            onClick={() =>
+              onMessage('Admin activity opened.')
+            }
+          />
+        </div>
+      </Panel>
+    </>
+  );
+}
+
+function SecuritySection({
+  search,
+  onMessage,
+}: {
+  search: string;
+  onMessage: (text: string) => void;
+}) {
+  const logs = [
+    {
+      action: 'Super Admin Login',
+      user: 'sadmin@gyd.com',
+      time: 'Today, 17:12',
+    },
+    {
+      action: 'Funding Account Viewed',
+      user: 'Super Admin',
+      time: 'Today, 16:48',
+    },
+    {
+      action: 'User Status Reviewed',
+      user: 'Super Admin',
+      time: 'Today, 15:20',
+    },
+    {
+      action: 'System Settings Opened',
+      user: 'Super Admin',
+      time: 'Today, 13:05',
+    },
+  ];
+
+  const filtered = logs.filter((log) =>
+    `${log.action} ${log.user} ${log.time}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  );
+
+  return (
+    <>
+      <Panel
+        title="Security Center"
+        subtitle="Privileged activity and system protection"
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <InfoCard
+            title="Security Status"
+            value="Protected"
+            detail="No critical alerts"
+            icon={ShieldCheck}
+          />
+
+          <InfoCard
+            title="Admin Sessions"
+            value="1"
+            detail="Current privileged session"
+            icon={Activity}
+          />
+
+          <InfoCard
+            title="Audit Records"
+            value="4,812"
+            detail="Recorded administrative events"
+            icon={Database}
+          />
+        </div>
+      </Panel>
+
+      <Panel
+        title="Activity Logs"
+        subtitle="Recent privileged actions"
+      >
+        <div className="space-y-3">
+          {filtered.map((log, index) => (
+            <button
+              key={`${log.action}-${index}`}
+              type="button"
+              onClick={() =>
+                onMessage(`${log.action} details opened.`)
+              }
+              className="flex w-full items-center gap-4 rounded-2xl border border-slate-100 p-4 text-left transition hover:bg-blue-50"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Activity className="h-4 w-4" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-slate-800">{log.action}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {log.user} • {log.time}
+                </p>
+              </div>
+
+              <ChevronRight className="h-4 w-4 text-slate-300" />
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onMessage('Full audit log opened.')}
+          className="mt-5 rounded-xl bg-[#07143d] px-4 py-2.5 text-xs font-bold text-white"
+        >
+          View Full Audit Log
+        </button>
+      </Panel>
+    </>
+  );
+}
+
+function NotificationsSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <Panel
+      title="Notifications"
+      subtitle="Executive alerts and system notices"
+    >
+      <div className="space-y-3">
+        <Alert
+          title="Funding review required"
+          detail="There are manual funding records ready for review."
+          onClick={() => onMessage('Funding notification opened.')}
+        />
+
+        <Alert
+          title="Security review"
+          detail="Recent privileged activity is available in the audit log."
+          onClick={() => onMessage('Security notification opened.')}
+        />
+
+        <Alert
+          title="System status"
+          detail="All major platform services are currently operational."
+          onClick={() => onMessage('System status opened.')}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onMessage('All notifications marked as reviewed.')}
+        className="mt-5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white"
+      >
+        Mark All Reviewed
+      </button>
+    </Panel>
+  );
+}
+
+function SettingsSection({
+  onMessage,
+}: {
+  onMessage: (text: string) => void;
+}) {
+  return (
+    <Panel
+      title="System Settings"
+      subtitle="High-level platform configuration"
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <SettingCard
+          title="Platform Configuration"
+          detail="General GY Data configuration"
+          onClick={() =>
+            onMessage('Platform configuration opened.')
+          }
+        />
+
+        <SettingCard
+          title="Security Settings"
+          detail="Authentication and privileged access"
+          onClick={() =>
+            onMessage('Security settings opened.')
+          }
+        />
+
+        <SettingCard
+          title="Funding Settings"
+          detail="Manual funding configuration"
+          onClick={() =>
+            onMessage('Funding settings opened.')
+          }
+        />
+
+        <SettingCard
+          title="Notification Settings"
+          detail="System alerts and notifications"
+          onClick={() =>
+            onMessage('Notification settings opened.')
+          }
+        />
+      </div>
+    </Panel>
+  );
+}
+
+function Panel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-5">
+        <h3 className="text-base font-bold text-[#07143d]">{title}</h3>
+
+        {subtitle && (
+          <p className="mt-1 text-xs text-slate-400">
+            {subtitle}
+          </p>
+        )}
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+  onClick,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+  icon: typeof Users;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-3xl border border-slate-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+          <Icon className="h-5 w-5" />
+        </div>
+
+        <ChevronRight className="h-4 w-4 text-slate-300" />
+      </div>
+
+      <p className="mt-5 text-xs font-semibold text-slate-400">{title}</p>
+
+      <p className="mt-1 text-2xl font-bold text-[#07143d]">{value}</p>
+
+      <p className="mt-1 text-xs font-semibold text-emerald-600">
+        {detail}
+      </p>
+    </button>
+  );
+}
+
+function InfoCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  detail: string;
+  icon: typeof Users;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+        <Icon className="h-5 w-5" />
+      </div>
+
+      <p className="mt-5 text-xs font-semibold text-slate-400">{title}</p>
+
+      <p className="mt-1 text-2xl font-bold text-[#07143d]">{value}</p>
+
+      <p className="mt-1 text-xs text-slate-400">{detail}</p>
+    </div>
+  );
+}
+
+function ActionButton({
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: typeof Users;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-blue-100 hover:bg-blue-50"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
+        <Icon className="h-5 w-5" />
+      </div>
+
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-slate-800">
+          {title}
+        </span>
+
+        <span className="mt-1 block text-xs leading-5 text-slate-400">
+          {description}
+        </span>
+      </span>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+    </button>
+  );
+}
+
+function StatusRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+      <span className="text-sm font-semibold text-slate-600">
+        {label}
+      </span>
+
+      <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function Alert({
+  title,
+  detail,
+  onClick,
+}: {
+  title: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 rounded-2xl border border-slate-100 p-4 text-left hover:bg-blue-50"
+    >
+      <Bell className="mt-1 h-4 w-4 shrink-0 text-blue-600" />
+
+      <span className="flex-1">
+        <span className="block text-sm font-bold text-slate-800">
+          {title}
+        </span>
+
+        <span className="mt-1 block text-xs leading-5 text-slate-400">
+          {detail}
+        </span>
+      </span>
+
+      <ChevronRight className="mt-1 h-4 w-4 text-slate-300" />
+    </button>
+  );
+}
+
+function MetricBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-5">
+      <p className="text-xs font-semibold text-slate-400">{label}</p>
+      <p className="mt-2 text-xl font-bold text-[#07143d]">{value}</p>
+    </div>
+  );
+}
+
+function AdminCard({
+  name,
+  role,
+  status,
+  onClick,
+}: {
+  name: string;
+  role: string;
+  status: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-4 rounded-3xl border border-slate-100 p-5 text-left transition hover:bg-blue-50"
+    >
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+        <ShieldCheck className="h-5 w-5" />
+      </div>
+
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold text-slate-800">{name}</span>
+
+        <span className="mt-1 block text-xs text-slate-400">
+          {role}
+        </span>
+      </span>
+
+      <span className="text-right">
+        <span className="block rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600">
+          {status}
+        </span>
+
+        <ChevronRight className="ml-auto mt-2 h-4 w-4 text-slate-300" />
+      </span>
+    </button>
+  );
+}
+
+function SettingCard({
+  title,
+  detail,
+  onClick,
+}: {
+  title: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-5 text-left transition hover:border-blue-100 hover:bg-blue-50"
+    >
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
+        <Settings className="h-5 w-5" />
+      </div>
+
+      <span className="flex-1">
+        <span className="block font-bold text-slate-800">{title}</span>
+
+        <span className="mt-1 block text-xs text-slate-400">
+          {detail}
+        </span>
+      </span>
+
+      <ChevronRight className="h-4 w-4 text-slate-300" />
+    </button>
+  );
+}
