@@ -27,18 +27,18 @@ export default function BottomNav() {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const startLongPress = () => {
+  const startAdminHold = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
     }
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      navigate('/super-admin-login');
+      navigate('/super-admin-login', { replace: false });
     }, LONG_PRESS_TIME);
   };
 
-  const stopLongPress = () => {
+  const cancelAdminHold = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -47,6 +47,7 @@ export default function BottomNav() {
 
   return (
     <>
+      {/* Normal bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 sm:max-w-md sm:left-1/2 sm:-translate-x-1/2">
         <div className="glass border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-around">
@@ -98,30 +99,22 @@ export default function BottomNav() {
         </div>
       </div>
 
-      {/* Super Admin hidden access button */}
+      {/* Super Admin long-press button */}
       <button
         type="button"
         aria-label="Super Admin Login"
-        onTouchStart={(e) => {
-          e.preventDefault();
-          startLongPress();
-        }}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          stopLongPress();
-        }}
-        onTouchCancel={stopLongPress}
-        onMouseDown={startLongPress}
-        onMouseUp={stopLongPress}
-        onMouseLeave={stopLongPress}
-        onContextMenu={(e) => e.preventDefault()}
-        className="fixed bottom-24 right-4 z-[9999] flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        onPointerDown={startAdminHold}
+        onPointerUp={cancelAdminHold}
+        onPointerCancel={cancelAdminHold}
+        onPointerLeave={cancelAdminHold}
+        onContextMenu={(event) => event.preventDefault()}
+        className="fixed bottom-24 right-4 z-[99999] flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-300 bg-white shadow-2xl dark:border-slate-600 dark:bg-slate-900"
         style={{
           touchAction: 'none',
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        <ShieldCheck className="h-5 w-5 text-slate-300 dark:text-slate-600" />
+        <ShieldCheck className="h-6 w-6 text-slate-400 dark:text-slate-500" />
       </button>
     </>
   );
