@@ -34,7 +34,7 @@ export default function Login() {
 
       {/* Logo */}
       <div className="
-        mt-16
+        mt-8
         text-center
         z-10
       ">
@@ -42,14 +42,14 @@ export default function Login() {
         <img
           src="/logo.png"
           alt="GY DATA"
-          className="w-32 mx-auto"
+          className="w-24 mx-auto"
         />
 
         <h3 className="
           text-blue-500
-          text-xl
+          text-lg
           font-semibold
-          mt-2
+          mt-1
         ">
           Endless Joy
         </h3>
@@ -61,11 +61,11 @@ export default function Login() {
       {/* Login Card */}
       <div className="
         bg-white
-        w-[88%]
-        max-w-md
-        rounded-[30px]
-        mt-10
-        p-8
+        w-[70%]
+        max-w-sm
+        rounded-[24px]
+        mt-6
+        p-4
         z-10
         shadow-xl
       ">
@@ -74,7 +74,7 @@ export default function Login() {
         <h1 className="
           text-center
           text-[#061442]
-          text-3xl
+          text-xl
           font-bold
         ">
           Welcome Back
@@ -84,7 +84,8 @@ export default function Login() {
         <p className="
           text-center
           text-gray-400
-          mt-2
+          text-xs
+          mt-1
         ">
           Enter your phone number to continue
         </p>
@@ -93,7 +94,8 @@ export default function Login() {
 
         <label className="
           block
-          mt-8
+          mt-4
+          text-xs
           text-gray-700
         ">
           Phone Number
@@ -104,24 +106,22 @@ export default function Login() {
           flex
           items-center
           border
-          rounded-xl
-          h-14
-          mt-2
+          rounded-lg
+          h-10
+          mt-1
+          text-xs
         ">
 
-          <span className="
-            px-4
-            border-r
-          ">
+          <span className="px-2 border-r">
             +234
           </span>
-
 
           <input
             className="
               flex-1
               outline-none
-              px-3
+              px-2
+              w-full
             "
             placeholder="801 234 5678"
           />
@@ -132,12 +132,12 @@ export default function Login() {
 
         <button className="
           w-full
-          h-14
+          h-10
           bg-[#062c85]
           text-white
-          rounded-xl
-          mt-6
-          text-lg
+          rounded-lg
+          mt-4
+          text-sm
           font-semibold
         ">
           Continue →
@@ -145,20 +145,20 @@ export default function Login() {
 
 
 
-
         <div className="
           flex
           items-center
-          gap-3
-          my-8
+          gap-2
+          my-4
           text-gray-400
+          text-xs
         ">
 
           <span className="
             flex-1
             h-px
             bg-gray-300
-          />
+          "/>
 
           OR
 
@@ -166,7 +166,7 @@ export default function Login() {
             flex-1
             h-px
             bg-gray-300
-          />
+          "/>
 
         </div>
 
@@ -176,6 +176,7 @@ export default function Login() {
         <h2 className="
           text-center
           text-[#061442]
+          text-sm
           font-bold
         ">
           Enter PIN
@@ -185,19 +186,18 @@ export default function Login() {
         <p className="
           text-center
           text-gray-400
-          text-sm
+          text-xs
         ">
           Enter your 6-digit Login PIN
         </p>
 
 
 
-
         <div className="
           flex
           justify-center
-          gap-3
-          mt-5
+          gap-2
+          mt-3
         ">
 
           {[1,2,3,4,5,6].map(i => (
@@ -205,14 +205,15 @@ export default function Login() {
             <div
               key={i}
               className="
-                w-10
-                h-12
+                w-7
+                h-8
                 border
-                rounded-xl
+                rounded-md
                 flex
                 items-center
                 justify-center
                 text-blue-900
+                text-xs
               "
             >
               ●
@@ -227,8 +228,8 @@ export default function Login() {
         <p className="
           text-center
           text-blue-600
-          mt-6
-          text-sm
+          mt-3
+          text-xs
         ">
           Forgot PIN?
         </p>
@@ -238,16 +239,15 @@ export default function Login() {
 
 
 
-
-      {/* Invisible Secret Admin Area */}
+      {/* Secret Super Admin Trigger */}
       <div
 
         className="
           fixed
-          right-8
-          bottom-20
-          w-24
-          h-24
+          right-5
+          bottom-16
+          w-20
+          h-20
           rounded-full
           z-50
         "
@@ -263,13 +263,13 @@ export default function Login() {
 
 
 
-      {/* Background Circle */}
+      {/* Bottom Circle */}
       <div className="
         absolute
-        -bottom-32
-        -right-24
-        w-80
-        h-80
+        -bottom-24
+        -right-20
+        w-64
+        h-64
         rounded-full
         bg-blue-900/40
       "/>
