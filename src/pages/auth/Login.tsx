@@ -1,21 +1,21 @@
 import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import Logo from "@/components/Logo";
 
 export default function Login() {
 
   const navigate = useNavigate();
   const timer = useRef<any>(null);
 
-  const startHold = () => {
+  const startSecretPress = () => {
     timer.current = setTimeout(() => {
       navigate("/super-admin-login");
     }, 2000);
   };
 
-  const cancelHold = () => {
+  const stopSecretPress = () => {
     if (timer.current) {
       clearTimeout(timer.current);
+      timer.current = null;
     }
   };
 
@@ -27,23 +27,33 @@ export default function Login() {
       flex
       flex-col
       items-center
-      overflow-hidden
       relative
+      overflow-hidden
     ">
 
 
       {/* Logo */}
-      <div className="mt-16 text-center">
-        <Logo />
+      <div className="
+        mt-16
+        text-center
+        z-10
+      ">
 
-        <p className="
+        <img
+          src="/logo.png"
+          alt="GY DATA"
+          className="w-32 mx-auto"
+        />
+
+        <h3 className="
           text-blue-500
-          text-lg
-          mt-2
+          text-xl
           font-semibold
+          mt-2
         ">
           Endless Joy
-        </p>
+        </h3>
+
       </div>
 
 
@@ -51,19 +61,19 @@ export default function Login() {
       {/* Login Card */}
       <div className="
         bg-white
-        w-[86%]
+        w-[88%]
         max-w-md
         rounded-[30px]
-        mt-12
+        mt-10
         p-8
-        shadow-[0_0_35px_rgba(20,100,255,0.35)]
         z-10
+        shadow-xl
       ">
 
 
         <h1 className="
           text-center
-          text-[#071442]
+          text-[#061442]
           text-3xl
           font-bold
         ">
@@ -76,59 +86,62 @@ export default function Login() {
           text-gray-400
           mt-2
         ">
-          Enter your details to continue
+          Enter your phone number to continue
         </p>
 
 
 
-        <div className="mt-8">
+        <label className="
+          block
+          mt-8
+          text-gray-700
+        ">
+          Phone Number
+        </label>
 
-          <label className="text-sm text-gray-700">
-            Phone Number
-          </label>
 
+        <div className="
+          flex
+          items-center
+          border
+          rounded-xl
+          h-14
+          mt-2
+        ">
 
-          <div className="
-            flex
-            items-center
-            border
-            rounded-xl
-            h-14
-            mt-2
+          <span className="
+            px-4
+            border-r
           ">
-
-            <span className="px-4 border-r">
-              +234
-            </span>
-
-            <input
-              className="
-                flex-1
-                outline-none
-                px-3
-              "
-              placeholder="801 234 5678"
-            />
-
-          </div>
+            +234
+          </span>
 
 
-
-          <button className="
-            w-full
-            h-14
-            bg-[#062c85]
-            text-white
-            rounded-xl
-            mt-6
-            text-lg
-            font-semibold
-          ">
-            Continue →
-          </button>
-
+          <input
+            className="
+              flex-1
+              outline-none
+              px-3
+            "
+            placeholder="801 234 5678"
+          />
 
         </div>
+
+
+
+        <button className="
+          w-full
+          h-14
+          bg-[#062c85]
+          text-white
+          rounded-xl
+          mt-6
+          text-lg
+          font-semibold
+        ">
+          Continue →
+        </button>
 
 
 
@@ -141,9 +154,19 @@ export default function Login() {
           text-gray-400
         ">
 
-          <span className="h-px bg-gray-300 flex-1"/>
+          <span className="
+            flex-1
+            h-px
+            bg-gray-300
+          />
+
           OR
-          <span className="h-px bg-gray-300 flex-1"/>
+
+          <span className="
+            flex-1
+            h-px
+            bg-gray-300
+          />
 
         </div>
 
@@ -152,7 +175,7 @@ export default function Login() {
 
         <h2 className="
           text-center
-          text-[#071442]
+          text-[#061442]
           font-bold
         ">
           Enter PIN
@@ -164,8 +187,9 @@ export default function Login() {
           text-gray-400
           text-sm
         ">
-          Enter your 6 digit login PIN
+          Enter your 6-digit Login PIN
         </p>
+
 
 
 
@@ -176,7 +200,8 @@ export default function Login() {
           mt-5
         ">
 
-          {[1,2,3,4,5,6].map(i=>(
+          {[1,2,3,4,5,6].map(i => (
+
             <div
               key={i}
               className="
@@ -190,8 +215,9 @@ export default function Login() {
                 text-blue-900
               "
             >
-              •
+              ●
             </div>
+
           ))}
 
         </div>
@@ -213,17 +239,8 @@ export default function Login() {
 
 
 
-      {/* Invisible Secret Super Admin Circle */}
-
+      {/* Invisible Secret Admin Area */}
       <div
-
-        onMouseDown={startHold}
-        onMouseUp={cancelHold}
-        onMouseLeave={cancelHold}
-
-        onTouchStart={startHold}
-        onTouchEnd={cancelHold}
-
 
         className="
           fixed
@@ -232,23 +249,29 @@ export default function Login() {
           w-24
           h-24
           rounded-full
-          bg-transparent
           z-50
         "
+
+        onMouseDown={startSecretPress}
+        onMouseUp={stopSecretPress}
+        onMouseLeave={stopSecretPress}
+
+        onTouchStart={startSecretPress}
+        onTouchEnd={stopSecretPress}
 
       />
 
 
-      {/* Background Circle */}
 
+      {/* Background Circle */}
       <div className="
         absolute
         -bottom-32
-        -right-20
+        -right-24
         w-80
         h-80
         rounded-full
-        bg-blue-900/30
+        bg-blue-900/40
       "/>
 
 
