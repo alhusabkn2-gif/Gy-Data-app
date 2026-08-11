@@ -1,21 +1,43 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Phone } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import Logo from '../../components/Logo';
 import PinInput from '../../components/ui/PinInput';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 
+const SECRET_HOLD_TIME = 2000;
+
 export default function Login() {
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { login } = useAuth();
 
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const secretTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startSecretHold = () => {
+    if (secretTimerRef.current) {
+      clearTimeout(secretTimerRef.current);
+    }
+
+    secretTimerRef.current = setTimeout(() => {
+      secretTimerRef.current = null;
+      navigate('/super-admin-login');
+    }, SECRET_HOLD_TIME);
+  };
+
+  const cancelSecretHold = () => {
+    if (secretTimerRef.current) {
+      clearTimeout(secretTimerRef.current);
+      secretTimerRef.current = null;
+    }
+  };
 
   const handleLogin = async () => {
     const cleanPhone = phone.replace(/\D/g, '');
@@ -48,17 +70,44 @@ export default function Login() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#020b2b] px-5 py-8 flex items-center justify-center">
 
-      {/* Background glow */}
+      {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -left-24 top-[30%] w-72 h-72 rounded-full bg-blue-600/20 blur-3xl" />
-        <div className="absolute -right-24 bottom-[10%] w-80 h-80 rounded-full bg-blue-500/20 blur-3xl" />
 
-        <div className="absolute left-0 bottom-20 w-48 h-48 rounded-full border border-blue-500/10" />
-        <div className="absolute right-[-60px] top-20 w-52 h-52 rounded-full border border-blue-500/10" />
+        {/* TOP-LEFT SPHERICAL SHAPE */}
+        <div
+          className="
+            absolute
+            -left-20
+            -top-20
+            h-64
+            w-64
+            rounded-full
+            border
+            border-white/[0.04]
+            bg-blue-400/[0.025]
+            shadow-[inset_0_0_70px_rgba(96,165,250,0.035)]
+          "
+        />
 
-        <div className="absolute left-10 bottom-28 w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_18px_6px_rgba(59,130,246,0.35)]" />
-        <div className="absolute right-8 top-40 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_15px_5px_rgba(59,130,246,0.3)]" />
-        <div className="absolute right-16 bottom-40 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_18px_5px_rgba(59,130,246,0.3)]" />
+        {/* BOTTOM-RIGHT SPHERICAL SHAPE */}
+        <div
+          className="
+            absolute
+            -right-24
+            -bottom-24
+            h-72
+            w-72
+            rounded-full
+            border
+            border-white/[0.04]
+            bg-blue-400/[0.025]
+            shadow-[inset_0_0_80px_rgba(96,165,250,0.035)]
+          "
+        />
+
+        {/* Very subtle ambient glow */}
+        <div className="absolute -left-24 top-[30%] h-72 w-72 rounded-full bg-blue-600/[0.08] blur-3xl" />
+        <div className="absolute -right-24 bottom-[10%] h-80 w-80 rounded-full bg-blue-500/[0.07] blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-md">
@@ -69,14 +118,14 @@ export default function Login() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.55, ease: 'easeOut' }}
           className="
-            bg-white
             rounded-[30px]
+            bg-white
             px-6
-            sm:px-10
             py-10
             shadow-[0_0_45px_rgba(37,99,235,0.22)]
             ring-1
             ring-blue-100
+            sm:px-10
           "
         >
 
@@ -85,18 +134,18 @@ export default function Login() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.45 }}
-            className="flex justify-center mb-8"
+            className="mb-8 flex justify-center"
           >
             <Logo size="lg" />
           </motion.div>
 
           {/* Welcome */}
-          <div className="text-center mb-7">
-            <h1 className="text-[28px] sm:text-3xl font-bold font-display text-[#07143d]">
+          <div className="mb-7 text-center">
+            <h1 className="font-display text-[28px] font-bold text-[#07143d] sm:text-3xl">
               Welcome Back
             </h1>
 
-            <p className="text-slate-500 text-sm mt-2">
+            <p className="mt-2 text-sm text-slate-500">
               Enter your phone number to continue
             </p>
           </div>
@@ -114,18 +163,21 @@ export default function Login() {
                 setPhone(e.target.value);
                 setError('');
               }}
-              error={error && phone.replace(/\D/g, '').length < 11 ? error : ''}
+              error={
+                error && phone.replace(/\D/g, '').length < 11
+                  ? error
+                  : ''
+              }
               autoFocus
               className="
-                !border-slate-200
                 !rounded-2xl
+                !border-slate-200
                 !bg-white
                 focus:!border-blue-500
                 focus:!ring-blue-500/20
               "
             />
 
-            {/* Continue */}
             <Button
               type="button"
               fullWidth
@@ -137,6 +189,7 @@ export default function Login() {
                 }
 
                 setError('');
+
                 document
                   .getElementById('login-pin-section')
                   ?.scrollIntoView({
@@ -145,66 +198,53 @@ export default function Login() {
                   });
               }}
               className="
+                !rounded-2xl
                 !bg-gradient-to-r
                 !from-[#071b55]
                 !via-[#082b82]
                 !to-[#063da5]
-                hover:!from-[#061746]
-                hover:!to-[#06358f]
-                !rounded-2xl
                 !shadow-[0_7px_20px_rgba(7,29,91,0.30)]
               "
             >
               Continue
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight className="h-5 w-5" />
             </Button>
           </div>
 
           {/* OR */}
-          <div className="flex items-center gap-4 my-8">
+          <div className="my-8 flex items-center gap-4">
             <div className="h-px flex-1 bg-slate-200" />
-
-            <span className="text-sm font-medium text-slate-400">
-              OR
-            </span>
-
+            <span className="text-sm font-medium text-slate-400">OR</span>
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-          {/* PIN section */}
+          {/* PIN */}
           <div id="login-pin-section">
 
-            <div className="text-center mb-6">
-
+            <div className="mb-6 text-center">
               <div className="
-                w-12
-                h-12
-                rounded-2xl
-                bg-[#071b55]/5
-                flex
-                items-center
-                justify-center
                 mx-auto
                 mb-3
+                flex
+                h-12
+                w-12
+                items-center
+                justify-center
+                rounded-2xl
+                bg-[#071b55]/5
               ">
-                <Phone className="w-6 h-6 text-[#071b55]" />
+                <Phone className="h-6 w-6 text-[#071b55]" />
               </div>
 
-              <h2 className="
-                text-[25px]
-                font-bold
-                font-display
-                text-[#07143d]
-              ">
+              <h2 className="font-display text-[25px] font-bold text-[#07143d]">
                 Enter PIN
               </h2>
 
-              <p className="text-slate-500 text-sm mt-1">
+              <p className="mt-1 text-sm text-slate-500">
                 Enter your 6-digit Login PIN
               </p>
             </div>
 
-            {/* PIN */}
             <div className="mb-6">
               <PinInput
                 length={6}
@@ -221,20 +261,19 @@ export default function Login() {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-center text-sm text-red-500 mt-3"
+                  className="mt-3 text-center text-sm text-red-500"
                 >
                   {error}
                 </motion.p>
               )}
 
               {loading && (
-                <p className="text-center text-sm text-blue-600 mt-3 font-medium">
+                <p className="mt-3 text-center text-sm font-medium text-blue-600">
                   Verifying...
                 </p>
               )}
             </div>
 
-            {/* Login */}
             <Button
               type="button"
               fullWidth
@@ -242,33 +281,25 @@ export default function Login() {
               onClick={handleLogin}
               loading={loading}
               className="
+                !rounded-2xl
                 !bg-gradient-to-r
                 !from-[#071b55]
                 !via-[#082b82]
                 !to-[#063da5]
-                hover:!from-[#061746]
-                hover:!to-[#06358f]
-                !rounded-2xl
                 !shadow-[0_7px_20px_rgba(7,29,91,0.30)]
               "
             >
               Login
-              <ArrowRight className="w-5 h-5" />
+              <ArrowRight className="h-5 w-5" />
             </Button>
 
-            {/* Forgot PIN */}
-            <div className="text-center mt-5">
+            <div className="mt-5 text-center">
               <button
                 type="button"
                 onClick={() =>
                   alert('PIN reset would be handled via SMS OTP here')
                 }
-                className="
-                  text-sm
-                  text-blue-600
-                  font-medium
-                  hover:underline
-                "
+                className="text-sm font-medium text-blue-600 hover:underline"
               >
                 Forgot PIN?
               </button>
@@ -277,40 +308,39 @@ export default function Login() {
         </motion.div>
 
         {/* Register */}
-        <div className="text-center mt-6">
+        <div className="mt-6 text-center">
           <p className="text-sm text-white/50">
             Don't have an account?{' '}
             <Link
               to="/register"
-              className="text-white font-semibold hover:underline"
+              className="font-semibold text-white hover:underline"
             >
               Create one
             </Link>
           </p>
         </div>
 
-        {/* Secret buttons — plain & very subtle */}
-        <div className="relative mt-7 h-28 opacity-[0.08]">
+        {/* Secret / decorative circles */}
+        <div className="relative mt-7 h-28">
 
+          {/* Circle 1 — SUPER ADMIN SECRET */}
           <SecretCircle
             className="absolute left-[18%] top-0"
-            onClick={() => navigate('/admin')}
+            secret
+            onPointerDown={startSecretHold}
+            onPointerUp={cancelSecretHold}
+            onPointerCancel={cancelSecretHold}
+            onPointerLeave={cancelSecretHold}
           />
 
-          <SecretCircle
-            className="absolute right-[18%] top-0"
-            onClick={() => navigate(user ? '/home' : '/login')}
-          />
+          {/* Circle 2 — decorative only */}
+          <SecretCircle className="absolute right-[18%] top-0" />
 
-          <SecretCircle
-            className="absolute left-[42%] bottom-0"
-            onClick={() => navigate(user ? '/wallet' : '/login')}
-          />
+          {/* Circle 3 — decorative only */}
+          <SecretCircle className="absolute left-[42%] bottom-0" />
 
-          <SecretCircle
-            className="absolute right-[8%] bottom-0"
-            onClick={() => navigate(user ? '/wallet' : '/login')}
-          />
+          {/* Circle 4 — decorative spherical shape */}
+          <SecretCircle className="absolute right-[8%] bottom-0 spherical" />
 
         </div>
       </div>
@@ -319,28 +349,57 @@ export default function Login() {
 }
 
 function SecretCircle({
-  onClick,
+  secret = false,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  onPointerLeave,
   className = '',
 }: {
-  onClick: () => void;
+  secret?: boolean;
+  onPointerDown?: () => void;
+  onPointerUp?: () => void;
+  onPointerCancel?: () => void;
+  onPointerLeave?: () => void;
   className?: string;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
-      whileTap={{ scale: 0.9 }}
-      onClick={onClick}
-      aria-label=""
+      tabIndex={-1}
+      aria-hidden={!secret}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerLeave}
+      onContextMenu={(event) => event.preventDefault()}
       className={`
-        w-[48px]
         h-[48px]
+        w-[48px]
         rounded-full
-        bg-blue-500
         border
-        border-blue-300/20
-        shadow-[0_0_18px_rgba(37,99,235,0.25)]
+        border-white/[0.025]
+        bg-white/[0.015]
+        opacity-[0.08]
+        shadow-none
+        outline-none
+        focus:outline-none
+        active:outline-none
+        select-none
+        touch-none
+        cursor-default
         ${className}
       `}
-    />
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'none',
+      }}
+    >
+      {secret ? null : null}
+    </button>
   );
 }
+
+Abin da wannan ya yi: sama-hagu da ƙasa-dama suna da subtle spherical appearance, yayin da circles ɗin ba sa nuna wani tap feedback. Secret ɗin yana buɗe Super Admin ne kawai bayan an riƙe shi na 2 seconds.
+
+Bayan ka manna: Save → Commit → Push → Render build.
