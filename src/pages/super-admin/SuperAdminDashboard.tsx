@@ -20,9 +20,6 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-const SESSION_KEY = 'gydata_super_admin_session';
 
 type Section =
   | 'overview'
@@ -36,68 +33,92 @@ type Section =
   | 'notifications'
   | 'settings';
 
-const sections: Array<{ id: Section; label: string; icon: typeof Users }> = [
+type NavItem = {
+  id: Section;
+  label: string;
+  icon: typeof Users;
+};
+
+const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'users', label: 'Users Management', icon: Users },
-  { id: 'wallet', label: 'Wallet / Manual Funding', icon: Wallet },
+  { id: 'wallet', label: 'Wallet / Funding', icon: Wallet },
   { id: 'transactions', label: 'Transactions', icon: CreditCard },
   { id: 'revenue', label: 'Revenue / Statistics', icon: ArrowUpRight },
-  { id: 'funding', label: 'Funding Accounts', icon: ArrowDownToLine },
+  { id: 'funding', label: 'Funding Accounts', icon: Database },
   { id: 'admins', label: 'Admin Management', icon: ShieldCheck },
-  { id: 'security', label: 'Security / Activity Logs', icon: Activity },
+  { id: 'security', label: 'Security / Logs', icon: Activity },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'settings', label: 'System Settings', icon: Settings },
 ];
 
-const titles: Record<Section, string> = {
-  overview: 'Executive Overview',
-  users: 'Users Management',
-  wallet: 'Wallet & Manual Funding',
-  transactions: 'Transactions',
-  revenue: 'Revenue & Statistics',
-  funding: 'Funding Accounts',
-  admins: 'Admin Management',
-  security: 'Security & Activity Logs',
-  notifications: 'Notifications',
-  settings: 'System Settings',
-};
-
-const descriptions: Record<Section, string> = {
-  overview: 'Direct access to high-level operations',
-  users: 'Manage customer accounts and account status',
-  wallet: 'Monitor wallets and manual funding activity',
-  transactions: 'Review and monitor platform transactions',
-  revenue: 'Monitor platform performance and revenue',
-  funding: 'Manage platform funding accounts',
-  admins: 'Control administrative access and permissions',
-  security: 'Review security events and activity',
-  notifications: 'Review platform notifications and alerts',
-  settings: 'Manage system-level configuration',
-};
-
-type ButtonProps = {
-  children: ReactNode;
-  onClick: () => void;
-  className?: string;
+const sectionInfo: Record<
+  Section,
+  { title: string; description: string }
+> = {
+  overview: {
+    title: 'Executive Overview',
+    description: 'High-level control center for GY Data.',
+  },
+  users: {
+    title: 'Users Management',
+    description: 'Manage, search and control user accounts.',
+  },
+  wallet: {
+    title: 'Wallet & Funding',
+    description: 'Monitor wallet balances and manual funding.',
+  },
+  transactions: {
+    title: 'Transactions',
+    description: 'Review platform transaction activity.',
+  },
+  revenue: {
+    title: 'Revenue & Statistics',
+    description: 'Monitor platform performance and revenue.',
+  },
+  funding: {
+    title: 'Funding Accounts',
+    description: 'Manage manual funding accounts.',
+  },
+  admins: {
+    title: 'Admin Management',
+    description: 'Manage administrative access.',
+  },
+  security: {
+    title: 'Security & Activity Logs',
+    description: 'Review security and administrative activity.',
+  },
+  notifications: {
+    title: 'Notifications',
+    description: 'Monitor important platform alerts.',
+  },
+  settings: {
+    title: 'System Settings',
+    description: 'Manage high-level system configuration.',
+  },
 };
 
 function ActionButton({
   children,
   onClick,
   className = '',
-}: ButtonProps) {
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition active:scale-95 ${className}`}
     >
       {children}
     </button>
   );
 }
 
-function MetricCard({
+function SmallCard({
   title,
   value,
   subtitle,
@@ -114,64 +135,100 @@ function MetricCard({
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+      className="group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-400">
             {title}
           </p>
-          <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
-          <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+
+          <p className="mt-1 text-xl font-black text-slate-900">
+            {value}
+          </p>
+
+          <p className="mt-0.5 truncate text-[10px] text-slate-500">
+            {subtitle}
+          </p>
         </div>
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
-          <Icon className="h-5 w-5" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white">
+          <Icon className="h-4 w-4" />
         </div>
       </div>
     </button>
   );
 }
 
-function StatusRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-3 last:border-b-0">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-800">{value}</span>
-    </div>
-  );
-}
-
-function EmptyState({
+function MiniAction({
   icon: Icon,
   title,
   description,
-  action,
+  onClick,
+}: {
+  icon: typeof Users;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+        <Icon className="h-4 w-4" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-bold text-slate-800">
+          {title}
+        </p>
+
+        <p className="mt-0.5 truncate text-[10px] text-slate-500">
+          {description}
+        </p>
+      </div>
+
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function EmptyPanel({
+  icon: Icon,
+  title,
+  text,
+  onClick,
+  buttonText = 'Refresh',
 }: {
   icon: typeof Database;
   title: string;
-  description: string;
-  action?: ReactNode;
+  text: string;
+  onClick: () => void;
+  buttonText?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-        <Icon className="h-7 w-7" />
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <Icon className="h-5 w-5" />
       </div>
 
-      <h3 className="mt-4 text-lg font-bold text-slate-900">{title}</h3>
+      <h3 className="mt-3 text-sm font-bold text-slate-900">
+        {title}
+      </h3>
 
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-        {description}
+      <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-slate-500">
+        {text}
       </p>
 
-      {action && <div className="mt-5">{action}</div>}
+      <ActionButton
+        onClick={onClick}
+        className="mt-4 bg-blue-600 text-white hover:bg-blue-700"
+      >
+        {buttonText}
+      </ActionButton>
     </div>
   );
 }
@@ -180,211 +237,281 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
 
   const [section, setSection] = useState<Section>('overview');
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState(false);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
 
-  const open = (next: Section) => {
+  const goTo = (next: Section) => {
     setSection(next);
-    setMenuOpen(false);
+    setMobileMenu(false);
     setSearch('');
   };
 
-  const message = (text: string) => {
+  const showNotice = (text: string) => {
     setNotice(text);
-    window.setTimeout(() => setNotice(''), 2600);
+
+    window.setTimeout(() => {
+      setNotice('');
+    }, 2500);
   };
 
   const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem('gydata_super_admin');
+    localStorage.removeItem('gydata_super_admin_session');
     navigate('/super-admin-login', { replace: true });
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Total Users"
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <SmallCard
+          title="Users"
           value="0"
-          subtitle="Registered customer accounts"
+          subtitle="Registered users"
           icon={Users}
-          onClick={() => open('users')}
+          onClick={() => goTo('users')}
         />
 
-        <MetricCard
-          title="Wallet Balance"
+        <SmallCard
+          title="Wallet"
           value="₦0"
-          subtitle="Current platform wallet"
+          subtitle="Platform balance"
           icon={Wallet}
-          onClick={() => open('wallet')}
+          onClick={() => goTo('wallet')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Transactions"
           value="0"
-          subtitle="Total recorded transactions"
+          subtitle="Recorded transactions"
           icon={CreditCard}
-          onClick={() => open('transactions')}
+          onClick={() => goTo('transactions')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Revenue"
           value="₦0"
-          subtitle="Current recorded revenue"
-          icon={ArrowUpRight}
-          onClick={() => open('revenue')}
+          subtitle="Recorded revenue"
+          icon={BarChart3}
+          onClick={() => goTo('revenue')}
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
+      <div className="grid gap-5 xl:grid-cols-[1.5fr_0.8fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-slate-900">
+              <h2 className="text-sm font-black text-slate-900">
                 Quick Control Center
               </h2>
 
-              <p className="mt-1 text-xs text-slate-500">
-                Access high-level Super Admin operations.
+              <p className="mt-1 text-[10px] text-slate-500">
+                Direct access to executive operations.
               </p>
             </div>
 
             <ShieldCheck className="h-5 w-5 text-blue-600" />
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {sections.slice(1, 9).map((item) => {
-              const Icon = item.icon;
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <MiniAction
+              icon={Users}
+              title="Users Management"
+              description="Search and manage users"
+              onClick={() => goTo('users')}
+            />
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => open(item.id)}
-                  className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-                    <Icon className="h-5 w-5" />
-                  </div>
+            <MiniAction
+              icon={Wallet}
+              title="Wallet & Funding"
+              description="Manual wallet operations"
+              onClick={() => goTo('wallet')}
+            />
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-800">
-                      {item.label}
-                    </p>
+            <MiniAction
+              icon={CreditCard}
+              title="Transactions"
+              description="Review transactions"
+              onClick={() => goTo('transactions')}
+            />
 
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {descriptions[item.id]}
-                    </p>
-                  </div>
+            <MiniAction
+              icon={BarChart3}
+              title="Revenue Statistics"
+              description="View performance"
+              onClick={() => goTo('revenue')}
+            />
 
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                </button>
-              );
-            })}
+            <MiniAction
+              icon={Database}
+              title="Funding Accounts"
+              description="Manage funding accounts"
+              onClick={() => goTo('funding')}
+            />
+
+            <MiniAction
+              icon={ShieldCheck}
+              title="Admin Management"
+              description="Control admin access"
+              onClick={() => goTo('admins')}
+            />
+
+            <MiniAction
+              icon={Activity}
+              title="Security Logs"
+              description="Review activity"
+              onClick={() => goTo('security')}
+            />
+
+            <MiniAction
+              icon={Bell}
+              title="Notifications"
+              description="View system alerts"
+              onClick={() => goTo('notifications')}
+            />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
               <ShieldCheck className="h-5 w-5" />
             </div>
 
             <div>
-              <h2 className="font-bold text-slate-900">Executive Status</h2>
-              <p className="text-xs text-slate-500">
-                System control summary
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                Executive Office
               </p>
+
+              <h2 className="text-sm font-black text-slate-900">
+                System Status
+              </h2>
             </div>
           </div>
 
-          <div className="mt-5">
-            <StatusRow label="Office level" value="Super Admin" />
-            <StatusRow label="Access level" value="Highest" />
-            <StatusRow label="System status" value="Online" />
-            <StatusRow label="Security status" value="Protected" />
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">Access</span>
+              <span className="font-bold text-slate-800">
+                Super Admin
+              </span>
+            </div>
+
+            <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">System</span>
+              <span className="font-bold text-emerald-600">
+                Online
+              </span>
+            </div>
+
+            <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">Security</span>
+              <span className="font-bold text-blue-600">
+                Protected
+              </span>
+            </div>
           </div>
 
           <ActionButton
-            onClick={() => open('security')}
-            className="mt-5 w-full bg-slate-900 text-white hover:bg-slate-800"
+            onClick={() => goTo('security')}
+            className="mt-4 w-full bg-slate-900 text-white hover:bg-slate-800"
           >
-            <Activity className="h-4 w-4" />
-            Open Security Center
+            <Activity className="h-3.5 w-3.5" />
+            Security Center
           </ActionButton>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-black text-slate-900">
+              Recent Activity
+            </h2>
+
+            <p className="mt-1 text-[10px] text-slate-500">
+              Latest system activity will appear here.
+            </p>
+          </div>
+
+          <ActionButton
+            onClick={() => goTo('security')}
+            className="bg-slate-100 text-slate-700 hover:bg-slate-200"
+          >
+            View Logs
+            <ChevronRight className="h-3.5 w-3.5" />
+          </ActionButton>
+        </div>
+
+        <div className="mt-4 rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">
+          No activity records loaded yet.
         </div>
       </div>
     </div>
   );
 
   const renderUsers = () => (
-    <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <SmallCard
           title="All Users"
           value="0"
-          subtitle="Registered users"
+          subtitle="Registered"
           icon={Users}
-          onClick={() => message('All users selected.')}
+          onClick={() => showNotice('All users selected')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Active"
           value="0"
-          subtitle="Currently active"
+          subtitle="Active accounts"
           icon={UserCheck}
-          onClick={() => message('Active users selected.')}
+          onClick={() => showNotice('Active users selected')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Suspended"
           value="0"
-          subtitle="Currently suspended"
+          subtitle="Suspended accounts"
           icon={UserX}
-          onClick={() => message('Suspended users selected.')}
+          onClick={() => showNotice('Suspended users selected')}
         />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-bold text-slate-900">Users Management</h2>
+            <h2 className="text-sm font-black text-slate-900">
+              User Directory
+            </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Search and manage customer accounts.
+            <p className="mt-1 text-[10px] text-slate-500">
+              Search, suspend or activate customer accounts.
             </p>
           </div>
 
-          <div className="relative w-full lg:max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search users..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              placeholder="Search user..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
             />
           </div>
         </div>
 
-        <div className="mt-5">
-          <EmptyState
+        <div className="mt-4">
+          <EmptyPanel
             icon={Users}
             title="No user records loaded"
-            description={
+            text={
               search
-                ? `No connected user records match "${search}".`
-                : 'User records will appear here when connected to the application data source.'
+                ? `No connected records match "${search}".`
+                : 'Connect the user data source to display customer accounts here.'
             }
-            action={
-              <ActionButton
-                onClick={() => message('User data refresh requested.')}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Refresh Users
-              </ActionButton>
-            }
+            onClick={() => showNotice('User data refresh requested')}
           />
         </div>
       </div>
@@ -392,135 +519,122 @@ export default function SuperAdminDashboard() {
   );
 
   const renderWallet = () => (
-    <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Wallet Balance"
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <SmallCard
+          title="Balance"
           value="₦0"
-          subtitle="Platform wallet balance"
+          subtitle="Platform wallet"
           icon={Wallet}
-          onClick={() => message('Wallet balance selected.')}
+          onClick={() => showNotice('Wallet balance selected')}
         />
 
-        <MetricCard
-          title="Pending Funding"
+        <SmallCard
+          title="Pending"
           value="0"
-          subtitle="Awaiting review"
+          subtitle="Funding reviews"
           icon={ArrowDownToLine}
-          onClick={() => open('funding')}
+          onClick={() => goTo('funding')}
         />
 
-        <MetricCard
-          title="Manual Funding"
+        <SmallCard
+          title="Funding"
           value="₦0"
-          subtitle="Recorded manual funding"
+          subtitle="Manual funding"
           icon={Database}
-          onClick={() => open('funding')}
+          onClick={() => goTo('funding')}
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-bold text-slate-900">
-            Manual Funding Control
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-black text-slate-900">
+            Manual Funding Account
           </h2>
 
-          <p className="mt-1 text-xs text-slate-500">
-            PalmPay account currently configured for manual wallet funding.
-          </p>
+          <div className="mt-4 space-y-2">
+            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">Bank</span>
+              <span className="font-bold">PalmPay</span>
+            </div>
 
-          <div className="mt-5">
-            <StatusRow label="Bank" value="PalmPay" />
-            <StatusRow label="Account Number" value="9550627002" />
-            <StatusRow
-              label="Account Name"
-              value="Abdurrahman Yahaya Ibrahim"
-            />
+            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">Account Number</span>
+              <span className="font-bold">9550627002</span>
+            </div>
+
+            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
+              <span className="text-slate-500">Account Name</span>
+              <span className="text-right font-bold">
+                Abdurrahman Yahaya Ibrahim
+              </span>
+            </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <ActionButton
-              onClick={() => open('funding')}
+              onClick={() => goTo('funding')}
               className="bg-blue-600 text-white hover:bg-blue-700"
             >
-              <ArrowDownToLine className="h-4 w-4" />
               Funding Accounts
             </ActionButton>
 
             <ActionButton
-              onClick={() => open('transactions')}
-              className="bg-slate-100 text-slate-800 hover:bg-slate-200"
+              onClick={() => goTo('transactions')}
+              className="bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
-              <CreditCard className="h-4 w-4" />
               Transactions
             </ActionButton>
           </div>
         </div>
 
-        <EmptyState
+        <EmptyPanel
           icon={Wallet}
           title="Wallet records not connected"
-          description="Wallet operations are structured here and ready to connect to live wallet and funding data."
-          action={
-            <ActionButton
-              onClick={() => message('Wallet data refresh requested.')}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Refresh Wallet Data
-            </ActionButton>
-          }
+          text="Wallet operations are ready for connection to live wallet data."
+          onClick={() => showNotice('Wallet refresh requested')}
         />
       </div>
     </div>
   );
 
   const renderTransactions = () => (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-900">
+            <h2 className="text-sm font-black text-slate-900">
               Transaction Control
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Search, filter and review platform transactions.
+            <p className="mt-1 text-[10px] text-slate-500">
+              Search and filter platform transactions.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <ActionButton
-              onClick={() => message('Transaction filters opened.')}
-              className="bg-slate-100 text-slate-800 hover:bg-slate-200"
+              onClick={() => showNotice('Transaction filters opened')}
+              className="bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
               Filters
             </ActionButton>
 
             <ActionButton
-              onClick={() => message('Transaction export requested.')}
+              onClick={() => showNotice('Transaction export requested')}
               className="bg-blue-600 text-white hover:bg-blue-700"
             >
-              <ArrowDownToLine className="h-4 w-4" />
               Export
             </ActionButton>
           </div>
         </div>
 
-        <div className="mt-5">
-          <EmptyState
+        <div className="mt-4">
+          <EmptyPanel
             icon={CreditCard}
-            title="No transaction records loaded"
-            description="Transaction records will appear here when connected to the transaction data source."
-            action={
-              <ActionButton
-                onClick={() =>
-                  message('Transaction data refresh requested.')
-                }
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Refresh Transactions
-              </ActionButton>
-            }
+            title="No transactions loaded"
+            text="Transaction records will appear here when connected to the transaction source."
+            onClick={() => showNotice('Transaction refresh requested')}
           />
         </div>
       </div>
@@ -528,164 +642,137 @@ export default function SuperAdminDashboard() {
   );
 
   const renderRevenue = () => (
-    <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          title="Total Revenue"
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <SmallCard
+          title="Revenue"
           value="₦0"
-          subtitle="Recorded revenue"
+          subtitle="Total recorded"
           icon={ArrowUpRight}
-          onClick={() => message('Revenue overview selected.')}
+          onClick={() => showNotice('Revenue selected')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Today"
           value="₦0"
           subtitle="Today revenue"
           icon={BarChart3}
-          onClick={() => message('Today revenue selected.')}
+          onClick={() => showNotice('Today selected')}
         />
 
-        <MetricCard
-          title="This Month"
+        <SmallCard
+          title="Monthly"
           value="₦0"
           subtitle="Monthly revenue"
           icon={BarChart3}
-          onClick={() => message('Monthly revenue selected.')}
+          onClick={() => showNotice('Monthly selected')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Transactions"
           value="0"
-          subtitle="Revenue transactions"
+          subtitle="Revenue records"
           icon={CreditCard}
-          onClick={() => open('transactions')}
+          onClick={() => goTo('transactions')}
         />
       </div>
 
-      <EmptyState
+      <EmptyPanel
         icon={BarChart3}
-        title="Revenue analytics ready"
-        description="The executive statistics area is ready to receive live transaction and revenue data."
-        action={
-          <ActionButton
-            onClick={() => message('Revenue statistics refresh requested.')}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Refresh Statistics
-          </ActionButton>
-        }
+        title="Statistics ready"
+        text="Revenue analytics will populate when connected to transaction data."
+        onClick={() => showNotice('Statistics refresh requested')}
       />
     </div>
   );
 
   const renderFunding = () => (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-900">Funding Accounts</h2>
+            <h2 className="text-sm font-black text-slate-900">
+              Funding Accounts
+            </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Manage the accounts used for manual funding.
+            <p className="mt-1 text-[10px] text-slate-500">
+              Accounts used for manual wallet funding.
             </p>
           </div>
 
           <ActionButton
-            onClick={() =>
-              message('Add funding account workflow opened.')
-            }
+            onClick={() => showNotice('Add funding account opened')}
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
-            Add Funding Account
+            Add Account
           </ActionButton>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white">
-              <Database className="h-5 w-5" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
-                Primary Manual Funding Account
-              </p>
-
-              <h3 className="mt-1 font-bold text-slate-900">PalmPay</h3>
-
-              <div className="mt-3 space-y-1 text-sm text-slate-600">
-                <p>Account Number: 9550627002</p>
-                <p>
-                  Account Name: Abdurrahman Yahaya Ibrahim
-                </p>
-              </div>
-            </div>
-
-            <ActionButton
-              onClick={() =>
-                message('Funding account details opened.')
-              }
-              className="bg-white text-blue-700 shadow-sm hover:bg-blue-100"
-            >
-              Details
-            </ActionButton>
+        <button
+          type="button"
+          onClick={() => showNotice('PalmPay account details opened')}
+          className="mt-4 flex w-full items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-left transition hover:bg-blue-100"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <Database className="h-4 w-4" />
           </div>
-        </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">
+              Primary Account
+            </p>
+
+            <p className="mt-1 text-sm font-black text-slate-900">
+              PalmPay
+            </p>
+
+            <p className="mt-1 text-[10px] text-slate-600">
+              9550627002 · Abdurrahman Yahaya Ibrahim
+            </p>
+          </div>
+
+          <ChevronRight className="h-4 w-4 text-blue-500" />
+        </button>
       </div>
 
-      <EmptyState
+      <EmptyPanel
         icon={ArrowDownToLine}
         title="Funding activity"
-        description="Funding account activity and approval records will appear here when connected."
-        action={
-          <ActionButton
-            onClick={() => open('wallet')}
-            className="bg-slate-900 text-white hover:bg-slate-800"
-          >
-            Open Wallet Control
-          </ActionButton>
-        }
+        text="Funding activity and approval records will appear here."
+        onClick={() => goTo('wallet')}
+        buttonText="Open Wallet"
       />
     </div>
   );
 
   const renderAdmins = () => (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-900">
+            <h2 className="text-sm font-black text-slate-900">
               Admin Management
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Manage administrative access below the Super Admin level.
+            <p className="mt-1 text-[10px] text-slate-500">
+              Manage lower-level administrative access.
             </p>
           </div>
 
           <ActionButton
-            onClick={() => message('Add admin workflow opened.')}
+            onClick={() => showNotice('Add admin workflow opened')}
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
-            <Users className="h-4 w-4" />
             Add Admin
           </ActionButton>
         </div>
 
-        <div className="mt-5">
-          <EmptyState
+        <div className="mt-4">
+          <EmptyPanel
             icon={ShieldCheck}
             title="No admin records loaded"
-            description="Administrative accounts and permissions will appear here when connected to the admin data source."
-            action={
-              <ActionButton
-                onClick={() => message('Admin data refresh requested.')}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Refresh Admins
-              </ActionButton>
-            }
+            text="Admin accounts and permissions will appear when connected to the admin data source."
+            onClick={() => showNotice('Admin refresh requested')}
           />
         </div>
       </div>
@@ -693,159 +780,145 @@ export default function SuperAdminDashboard() {
   );
 
   const renderSecurity = () => (
-    <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard
-          title="Security Status"
-          value="Protected"
-          subtitle="Current system state"
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <SmallCard
+          title="Security"
+          value="OK"
+          subtitle="Protected"
           icon={ShieldCheck}
-          onClick={() => message('Security status selected.')}
+          onClick={() => showNotice('Security status selected')}
         />
 
-        <MetricCard
-          title="Activity Logs"
+        <SmallCard
+          title="Logs"
           value="0"
-          subtitle="Recorded activity events"
+          subtitle="Activity events"
           icon={Activity}
-          onClick={() => message('Activity logs selected.')}
+          onClick={() => showNotice('Activity logs selected')}
         />
 
-        <MetricCard
+        <SmallCard
           title="Alerts"
           value="0"
           subtitle="Security alerts"
           icon={Bell}
-          onClick={() => open('notifications')}
+          onClick={() => goTo('notifications')}
         />
       </div>
 
-      <EmptyState
+      <EmptyPanel
         icon={Activity}
-        title="Security activity is ready"
-        description="Login events, administrative actions and security records will appear here when connected to activity logging."
-        action={
-          <ActionButton
-            onClick={() => message('Full audit log requested.')}
-            className="bg-slate-900 text-white hover:bg-slate-800"
-          >
-            Open Full Audit Log
-          </ActionButton>
-        }
+        title="Security logs ready"
+        text="Login events, admin actions and security records will appear here."
+        onClick={() => showNotice('Audit log refresh requested')}
+        buttonText="Refresh Logs"
       />
     </div>
   );
 
   const renderNotifications = () => (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-bold text-slate-900">
-              Notifications & Alerts
-            </h2>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-black text-slate-900">
+            Notifications & Alerts
+          </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Monitor important platform notifications.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              message('Notifications marked as reviewed.')
-            }
-            className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
-          >
-            Mark Reviewed
-          </button>
+          <p className="mt-1 text-[10px] text-slate-500">
+            Important system alerts will appear here.
+          </p>
         </div>
 
-        <div className="mt-5">
-          <EmptyState
-            icon={Bell}
-            title="No notifications"
-            description="Important system alerts and administrative notifications will appear here."
-            action={
-              <ActionButton
-                onClick={() => message('Notifications refreshed.')}
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Refresh Notifications
-              </ActionButton>
-            }
-          />
-        </div>
+        <ActionButton
+          onClick={() => showNotice('Notifications marked as reviewed')}
+          className="bg-slate-100 text-slate-700 hover:bg-slate-200"
+        >
+          Mark Reviewed
+        </ActionButton>
+      </div>
+
+      <div className="mt-4">
+        <EmptyPanel
+          icon={Bell}
+          title="No notifications"
+          text="There are currently no loaded system notifications."
+          onClick={() => showNotice('Notifications refreshed')}
+        />
       </div>
     </div>
   );
 
   const renderSettings = () => (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-            <Settings className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <Settings className="h-4 w-4" />
           </div>
 
           <div>
-            <h2 className="font-bold text-slate-900">
+            <h2 className="text-sm font-black text-slate-900">
               System Settings
             </h2>
 
-            <p className="text-xs text-slate-500">
-              High-level application configuration.
+            <p className="text-[10px] text-slate-500">
+              High-level configuration.
             </p>
           </div>
         </div>
 
-        <div className="mt-5">
-          <StatusRow label="Platform" value="GY Data" />
-          <StatusRow label="Office" value="Executive Office" />
-          <StatusRow label="Environment" value="Production" />
-          <StatusRow label="Access" value="Super Admin" />
+        <div className="mt-4 space-y-2 text-xs">
+          <div className="flex justify-between border-b border-slate-100 py-2">
+            <span className="text-slate-500">Platform</span>
+            <b>GY Data</b>
+          </div>
+
+          <div className="flex justify-between border-b border-slate-100 py-2">
+            <span className="text-slate-500">Environment</span>
+            <b>Production</b>
+          </div>
+
+          <div className="flex justify-between border-b border-slate-100 py-2">
+            <span className="text-slate-500">Access</span>
+            <b>Super Admin</b>
+          </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 flex gap-2">
           <ActionButton
-            onClick={() => message('General settings opened.')}
-            className="bg-slate-100 text-slate-800 hover:bg-slate-200"
+            onClick={() => showNotice('General settings opened')}
+            className="bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
-            General Settings
+            General
           </ActionButton>
 
           <ActionButton
-            onClick={() => open('security')}
+            onClick={() => goTo('security')}
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
-            Security Settings
+            Security
           </ActionButton>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-bold text-slate-900">Danger Zone</h2>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-black text-slate-900">
+          Executive Controls
+        </h2>
 
-        <p className="mt-1 text-xs text-slate-500">
-          High-level actions requiring Super Admin control.
+        <p className="mt-1 text-[10px] text-slate-500">
+          High-level system actions.
         </p>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 space-y-2">
           <button
             type="button"
-            onClick={() =>
-              message('System maintenance controls opened.')
-            }
-            className="flex w-full items-center justify-between rounded-xl border border-slate-200 p-4 text-left hover:bg-slate-50"
+            onClick={() => showNotice('Maintenance controls opened')}
+            className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
           >
-            <span>
-              <span className="block text-sm font-bold text-slate-800">
-                Maintenance Controls
-              </span>
-
-              <span className="mt-1 block text-xs text-slate-500">
-                Manage system maintenance settings.
-              </span>
+            <span className="text-xs font-bold">
+              Maintenance Controls
             </span>
 
             <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -853,17 +926,11 @@ export default function SuperAdminDashboard() {
 
           <button
             type="button"
-            onClick={() => message('System backup controls opened.')}
-            className="flex w-full items-center justify-between rounded-xl border border-slate-200 p-4 text-left hover:bg-slate-50"
+            onClick={() => showNotice('Backup controls opened')}
+            className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
           >
-            <span>
-              <span className="block text-sm font-bold text-slate-800">
-                Backup Controls
-              </span>
-
-              <span className="mt-1 block text-xs text-slate-500">
-                Review system backup operations.
-              </span>
+            <span className="text-xs font-bold">
+              Backup Controls
             </span>
 
             <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -873,7 +940,7 @@ export default function SuperAdminDashboard() {
     </div>
   );
 
-  const renderSection = () => {
+  const renderContent = () => {
     switch (section) {
       case 'users':
         return renderUsers();
@@ -900,33 +967,33 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7fc] text-slate-800">
+    <div className="min-h-screen bg-[#f5f7fb] text-slate-800">
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#04102f] text-white shadow-2xl transition-transform duration-300 ${
-          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-[250px] bg-[#061337] text-white shadow-2xl transition-transform ${
+          mobileMenu ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 p-5">
+          <div className="border-b border-white/10 p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-500">
-                <ShieldCheck className="h-6 w-6" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
+                <ShieldCheck className="h-5 w-5" />
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">
-                  GY Data
+                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-300">
+                  GY DATA
                 </p>
 
-                <h1 className="text-lg font-bold">
+                <h1 className="text-sm font-black">
                   Executive Office
                 </h1>
               </div>
 
               <button
                 type="button"
-                onClick={() => setMenuOpen(false)}
-                className="ml-auto flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 lg:hidden"
+                onClick={() => setMobileMenu(false)}
+                className="ml-auto rounded-lg bg-white/10 p-2 lg:hidden"
                 aria-label="Close menu"
               >
                 <X className="h-4 w-4" />
@@ -934,13 +1001,13 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto p-3">
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+          <div className="flex-1 overflow-y-auto p-2.5">
+            <p className="px-2.5 pb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
               Control Center
             </p>
 
-            <div className="space-y-1">
-              {sections.map((item) => {
+            <div className="space-y-0.5">
+              {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = section === item.id;
 
@@ -948,11 +1015,11 @@ export default function SuperAdminDashboard() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => open(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${
+                    onClick={() => goTo(item.id)}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold transition ${
                       active
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30'
-                        : 'text-white/65 hover:bg-white/10 hover:text-white'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-white/60 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -962,19 +1029,19 @@ export default function SuperAdminDashboard() {
                     </span>
 
                     {active && (
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-3.5 w-3.5" />
                     )}
                   </button>
                 );
               })}
             </div>
-          </nav>
+          </div>
 
-          <div className="border-t border-white/10 p-3">
+          <div className="border-t border-white/10 p-2.5">
             <button
               type="button"
               onClick={logout}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/10 hover:text-red-200"
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-bold text-red-300 hover:bg-red-500/10"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -983,90 +1050,81 @@ export default function SuperAdminDashboard() {
         </div>
       </aside>
 
-      <div className="lg:pl-[280px]">
+      <div className="lg:pl-[250px]">
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="flex h-[76px] items-center gap-3 px-4 sm:px-6">
+          <div className="flex h-[68px] items-center gap-3 px-4 sm:px-5">
             <button
               type="button"
-              onClick={() => setMenuOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 lg:hidden"
+              onClick={() => setMobileMenu(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 lg:hidden"
               aria-label="Open menu"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-4 w-4" />
             </button>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-blue-600">
                 Super Admin
               </p>
 
-              <h2 className="truncate text-lg font-black text-slate-900">
-                {titles[section]}
+              <h2 className="truncate text-base font-black text-slate-900">
+                {sectionInfo[section].title}
               </h2>
             </div>
 
             <button
               type="button"
-              onClick={() => open('notifications')}
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600"
+              onClick={() => goTo('notifications')}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600"
               aria-label="Notifications"
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
             </button>
 
             <button
               type="button"
-              onClick={() => open('settings')}
-              className="hidden h-10 items-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 sm:flex"
+              onClick={() => goTo('settings')}
+              className="hidden h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 sm:flex"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-3.5 w-3.5" />
               Settings
             </button>
           </div>
         </header>
 
-        <main className="mx-auto max-w-[1600px] p-4 sm:p-6">
-          <div className="mb-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-400">
-                  GY Data Executive Control Center
-                </p>
+        <main className="mx-auto max-w-[1450px] p-4 sm:p-5">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400">
+                GY Data Executive Control Center
+              </p>
 
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-                  {titles[section]}
-                </h1>
+              <h1 className="mt-1 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+                {sectionInfo[section].title}
+              </h1>
 
-                <p className="mt-1 text-xs text-slate-400">
-                  {descriptions[section]}
-                </p>
-              </div>
-
-              {section !== 'overview' && (
-                <ActionButton
-                  onClick={() => open('overview')}
-                  className="bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                >
-                  Back to Overview
-                </ActionButton>
-              )}
+              <p className="mt-1 text-[10px] text-slate-400">
+                {sectionInfo[section].description}
+              </p>
             </div>
+
+            {section !== 'overview' && (
+              <ActionButton
+                onClick={() => goTo('overview')}
+                className="bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Overview
+              </ActionButton>
+            )}
           </div>
 
-          <motion.div
-            key={section}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderSection()}
-          </motion.div>
+          {renderContent()}
         </main>
       </div>
 
       {notice && (
-        <div className="fixed bottom-5 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
-          <div className="rounded-2xl bg-[#04102f] px-5 py-4 text-sm font-semibold text-white shadow-2xl">
+        <div className="fixed bottom-5 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2">
+          <div className="rounded-xl bg-[#061337] px-4 py-3 text-xs font-semibold text-white shadow-2xl">
             {notice}
           </div>
         </div>
