@@ -6,7 +6,6 @@ import {
   Copy,
   Check,
   Wallet,
-  Upload,
 } from 'lucide-react';
 
 import PageHeader from '../components/PageHeader';
@@ -28,19 +27,22 @@ const PALMPAY_ACCOUNT = '9550627002';
 const PALMPAY_BANK = 'PalmPay';
 const PALMPAY_NAME = 'Abdurrahman Yahaya Ibrahim';
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || '';
+
 export default function FundWallet() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
-  const [receipt, setReceipt] = useState<File | null>(null);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const copyAccount = async () => {
     try {
       await navigator.clipboard.writeText(PALMPAY_ACCOUNT);
+
       setCopied(true);
 
       setTimeout(() => {
@@ -69,39 +71,36 @@ export default function FundWallet() {
       return;
     }
 
-    if (!receipt) {
-      alert('Please upload your payment receipt.');
-      return;
-    }
-
     setLoading(true);
 
     try {
       /*
-       * Manual funding request.
+       * This matches the backend route:
        *
-       * NOTE:
-       * This requires the backend endpoint:
-       * POST /api/manual-funding/create
+       * POST /api/funding/request
+       *
+       * The backend expects:
+       * phone
+       * amount
+       * paymentMethod
+       * paymentReference
+       * notes
        */
 
-      const formData = new FormData();
-
-      formData.append('amount', String(numericAmount));
-      formData.append('phone', user.phone);
-      formData.append('reference', reference.trim());
-      formData.append('bank', PALMPAY_BANK);
-      formData.append('accountNumber', PALMPAY_ACCOUNT);
-      formData.append('accountName', PALMPAY_NAME);
-      formData.append('receipt', receipt);
-
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-
       const response = await fetch(
-        `${apiUrl}/api/manual-funding/create`,
+        `${API_BASE_URL}/api/funding/request`,
         {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: user.phone,
+            amount: numericAmount,
+            paymentMethod: 'manual',
+            paymentReference: reference.trim(),
+            notes: `PalmPay transfer to ${PALMPAY_ACCOUNT} - ${PALMPAY_NAME}`,
+          }),
         }
       );
 
@@ -115,7 +114,7 @@ export default function FundWallet() {
       }
 
       alert(
-        'Funding request submitted successfully. Please wait for admin approval.'
+        'Funding request submitted successfully. Your wallet will be credited after admin approval.'
       );
 
       navigate('/');
@@ -134,6 +133,7 @@ export default function FundWallet() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-5 pt-10 pb-28">
+
       {/* Back */}
       <button
         type="button"
@@ -176,6 +176,7 @@ export default function FundWallet() {
 
       {/* PalmPay Account */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 mb-5 shadow-sm">
+
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-xs text-slate-400">
@@ -193,6 +194,8 @@ export default function FundWallet() {
         </div>
 
         <div className="space-y-3">
+
+          {/* Account Number */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
             <div>
               <p className="text-[11px] text-slate-400">
@@ -217,6 +220,7 @@ export default function FundWallet() {
             </button>
           </div>
 
+          {/* Account Name */}
           <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
             <p className="text-[11px] text-slate-400">
               Account Name
@@ -227,6 +231,7 @@ export default function FundWallet() {
             </p>
           </div>
 
+          {/* Bank */}
           <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800">
             <p className="text-[11px] text-slate-400">
               Bank
@@ -236,18 +241,21 @@ export default function FundWallet() {
               {PALMPAY_BANK}
             </p>
           </div>
+
         </div>
 
         <div className="mt-4 p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10">
           <p className="text-xs leading-5 text-amber-700 dark:text-amber-300">
-            Make the transfer first, then enter the amount and
-            payment reference below and upload your receipt.
+            First transfer the money to the PalmPay account above.
+            Then enter the amount and payment reference below.
+            Your wallet will be credited after admin approval.
           </p>
         </div>
       </div>
 
       {/* Amount */}
       <div className="mb-5">
+
         <Input
           label="Amount"
           prefix="₦"
@@ -257,7 +265,10 @@ export default function FundWallet() {
           value={amount}
           onChange={(e) =>
             setAmount(
-              e.target.value.replace(/[^0-9.]/g, '')
+              e.target.value.replace(
+                /[^0-9.]/g,
+                ''
+              )
             )
           }
         />
@@ -267,58 +278,35 @@ export default function FundWallet() {
             <button
               key={value}
               type="button"
-              onClick={() => setAmount(String(value))}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300"
+              onClick={() =>
+                setAmount(String(value))
+              }
+              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:text-primary-600 transition-colors"
             >
               ₦{value.toLocaleString()}
             </button>
           ))}
         </div>
+
       </div>
 
-      {/* Reference */}
-      <div className="mb-5">
+      {/* Payment Reference */}
+      <div className="mb-6">
+
         <Input
           label="Payment Reference"
           type="text"
-          placeholder="Enter transfer reference"
+          placeholder="Enter your transfer reference"
           value={reference}
-          onChange={(e) => setReference(e.target.value)}
+          onChange={(e) =>
+            setReference(e.target.value)
+          }
         />
-      </div>
 
-      {/* Receipt */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Payment Receipt
-        </label>
+        <p className="text-xs text-slate-400 mt-2">
+          Enter the reference shown on your PalmPay transfer.
+        </p>
 
-        <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 cursor-pointer">
-          <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
-            <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {receipt
-                ? receipt.name
-                : 'Upload payment receipt'}
-            </p>
-
-            <p className="text-xs text-slate-400 mt-1">
-              Screenshot or image of your transfer
-            </p>
-          </div>
-
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) =>
-              setReceipt(e.target.files?.[0] || null)
-            }
-          />
-        </label>
       </div>
 
       {/* Submit */}
@@ -329,18 +317,18 @@ export default function FundWallet() {
         disabled={
           !amount ||
           Number.parseFloat(amount) < 100 ||
-          !reference.trim() ||
-          !receipt
+          !reference.trim()
         }
         onClick={handleSubmit}
       >
         Submit Funding Request
       </Button>
 
-      <p className="text-center text-xs text-slate-400 mt-3">
+      <p className="text-center text-xs text-slate-400 dark:text-slate-500 mt-3">
         Minimum funding amount is ₦100. Your wallet will be
         credited after admin approval.
       </p>
+
     </div>
   );
 }
