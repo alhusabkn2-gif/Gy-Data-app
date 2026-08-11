@@ -69,17 +69,12 @@ export default function BottomNav() {
                     <motion.div
                       layoutId="navActive"
                       className="absolute inset-0 rounded-2xl bg-primary-50 dark:bg-primary-500/10"
-                      transition={{
-                        type: 'spring',
-                        damping: 25,
-                        stiffness: 350,
-                      }}
                     />
                   )}
 
                   <Icon
                     className={cn(
-                      'relative h-5 w-5 transition-colors',
+                      'relative h-5 w-5',
                       active
                         ? 'text-primary-600 dark:text-primary-400'
                         : 'text-slate-400 dark:text-slate-500',
@@ -88,7 +83,7 @@ export default function BottomNav() {
 
                   <span
                     className={cn(
-                      'relative text-[10px] font-medium transition-colors',
+                      'relative text-[10px] font-medium',
                       active
                         ? 'text-primary-600 dark:text-primary-400'
                         : 'text-slate-400 dark:text-slate-500',
@@ -103,28 +98,27 @@ export default function BottomNav() {
         </div>
       </div>
 
-      {/* Hidden Super Admin access */}
+      {/* Super Admin access */}
       <button
         type="button"
         aria-label="Super Admin Login"
-        onTouchStart={(event) => {
-          event.preventDefault();
+        onTouchStart={(e) => {
+          e.preventDefault();
           startLongPress();
         }}
-        onTouchEnd={(event) => {
-          event.preventDefault();
+        onTouchEnd={(e) => {
+          e.preventDefault();
           stopLongPress();
         }}
         onTouchCancel={stopLongPress}
         onMouseDown={startLongPress}
         onMouseUp={stopLongPress}
         onMouseLeave={stopLongPress}
-        onContextMenu={(event) => {
-          event.preventDefault();
-        }}
-        className="fixed bottom-24 right-4 z-[100] flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        onContextMenu={(e) => e.preventDefault()}
+        className="fixed bottom-24 right-4 z-[9999] flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
         style={{
           touchAction: 'none',
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
         <ShieldCheck className="h-5 w-5 text-slate-300 dark:text-slate-600" />
