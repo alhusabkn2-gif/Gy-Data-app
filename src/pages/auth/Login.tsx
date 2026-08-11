@@ -55,10 +55,10 @@ export default function Login() {
     setLoading(true);
     setError('');
 
-    const { error: err } = await login(cleanPhone, pin);
+    const { error: loginError } = await login(cleanPhone, pin);
 
-    if (err) {
-      setError(err);
+    if (loginError) {
+      setError(loginError);
       setPin('');
       setLoading(false);
       return;
@@ -69,50 +69,31 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#020b2b] px-5 py-8 flex items-center justify-center">
-
-      {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-
-        {/* TOP-LEFT SPHERICAL SHAPE */}
         <div
           className="
-            absolute
-            -left-20
-            -top-20
-            h-64
-            w-64
-            rounded-full
-            border
-            border-white/[0.04]
+            absolute -left-20 -top-20 h-64 w-64 rounded-full
+            border border-white/[0.04]
             bg-blue-400/[0.025]
             shadow-[inset_0_0_70px_rgba(96,165,250,0.035)]
           "
         />
 
-        {/* BOTTOM-RIGHT SPHERICAL SHAPE */}
         <div
           className="
-            absolute
-            -right-24
-            -bottom-24
-            h-72
-            w-72
-            rounded-full
-            border
-            border-white/[0.04]
+            absolute -right-24 -bottom-24 h-72 w-72 rounded-full
+            border border-white/[0.04]
             bg-blue-400/[0.025]
             shadow-[inset_0_0_80px_rgba(96,165,250,0.035)]
           "
         />
 
-        {/* Very subtle ambient glow */}
         <div className="absolute -left-24 top-[30%] h-72 w-72 rounded-full bg-blue-600/[0.08] blur-3xl" />
+
         <div className="absolute -right-24 bottom-[10%] h-80 w-80 rounded-full bg-blue-500/[0.07] blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-md">
-
-        {/* Main card */}
         <motion.div
           initial={{ opacity: 0, y: 25, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -128,8 +109,6 @@ export default function Login() {
             sm:px-10
           "
         >
-
-          {/* Logo */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -139,7 +118,6 @@ export default function Login() {
             <Logo size="lg" />
           </motion.div>
 
-          {/* Welcome */}
           <div className="mb-7 text-center">
             <h1 className="font-display text-[28px] font-bold text-[#07143d] sm:text-3xl">
               Welcome Back
@@ -150,7 +128,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Phone */}
           <div className="space-y-5">
             <Input
               label="Phone Number"
@@ -211,28 +188,31 @@ export default function Login() {
             </Button>
           </div>
 
-          {/* OR */}
           <div className="my-8 flex items-center gap-4">
             <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-sm font-medium text-slate-400">OR</span>
+
+            <span className="text-sm font-medium text-slate-400">
+              OR
+            </span>
+
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-          {/* PIN */}
           <div id="login-pin-section">
-
             <div className="mb-6 text-center">
-              <div className="
-                mx-auto
-                mb-3
-                flex
-                h-12
-                w-12
-                items-center
-                justify-center
-                rounded-2xl
-                bg-[#071b55]/5
-              ">
+              <div
+                className="
+                  mx-auto
+                  mb-3
+                  flex
+                  h-12
+                  w-12
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  bg-[#071b55]/5
+                "
+              >
                 <Phone className="h-6 w-6 text-[#071b55]" />
               </div>
 
@@ -307,7 +287,6 @@ export default function Login() {
           </div>
         </motion.div>
 
-        {/* Register */}
         <div className="mt-6 text-center">
           <p className="text-sm text-white/50">
             Don't have an account?{' '}
@@ -320,28 +299,20 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Secret / decorative circles */}
         <div className="relative mt-7 h-28">
-
-          {/* Circle 1 — SUPER ADMIN SECRET */}
           <SecretCircle
             className="absolute left-[18%] top-0"
-            secret
             onPointerDown={startSecretHold}
             onPointerUp={cancelSecretHold}
             onPointerCancel={cancelSecretHold}
             onPointerLeave={cancelSecretHold}
           />
 
-          {/* Circle 2 — decorative only */}
           <SecretCircle className="absolute right-[18%] top-0" />
 
-          {/* Circle 3 — decorative only */}
           <SecretCircle className="absolute left-[42%] bottom-0" />
 
-          {/* Circle 4 — decorative spherical shape */}
-          <SecretCircle className="absolute right-[8%] bottom-0 spherical" />
-
+          <SecretCircle className="absolute right-[8%] bottom-0" />
         </div>
       </div>
     </div>
@@ -349,14 +320,12 @@ export default function Login() {
 }
 
 function SecretCircle({
-  secret = false,
   onPointerDown,
   onPointerUp,
   onPointerCancel,
   onPointerLeave,
   className = '',
 }: {
-  secret?: boolean;
   onPointerDown?: () => void;
   onPointerUp?: () => void;
   onPointerCancel?: () => void;
@@ -367,7 +336,7 @@ function SecretCircle({
     <button
       type="button"
       tabIndex={-1}
-      aria-hidden={!secret}
+      aria-hidden="true"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
@@ -394,10 +363,6 @@ function SecretCircle({
         WebkitTapHighlightColor: 'transparent',
         touchAction: 'none',
       }}
-    >
-      {secret ? null : null}
-    </button>
+    />
   );
-}s.
-
-Bayan ka manna: Save → Commit → Push → Render build.
+}
