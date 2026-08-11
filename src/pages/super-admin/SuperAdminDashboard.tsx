@@ -83,6 +83,7 @@ export default function SuperAdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem(SUPER_ADMIN_SESSION);
+
     navigate('/super-admin-login', {
       replace: true,
     });
@@ -90,16 +91,10 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] pb-10">
-
-      {/* Header */}
-
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-5 py-4 sm:px-8">
-
           <div className="flex items-center justify-between gap-4">
-
             <div className="flex items-center gap-3">
-
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#071b55] shadow-lg shadow-blue-900/20">
                 <ShieldCheck className="h-6 w-6 text-white" />
               </div>
@@ -113,11 +108,9 @@ export default function SuperAdminDashboard() {
                   Super Admin
                 </h1>
               </div>
-
             </div>
 
             <div className="flex items-center gap-2">
-
               <button
                 type="button"
                 className="hidden h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 sm:flex"
@@ -131,33 +124,24 @@ export default function SuperAdminDashboard() {
                 className="flex h-10 items-center gap-2 rounded-xl bg-red-50 px-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
               >
                 <LogOut className="h-4 w-4" />
+
                 <span className="hidden sm:inline">
                   Logout
                 </span>
               </button>
-
             </div>
-
           </div>
-
         </div>
       </header>
 
-      {/* Main */}
-
       <main className="mx-auto max-w-7xl px-5 pt-6 sm:px-8">
-
-        {/* Welcome */}
-
         <motion.section
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           className="mb-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#071b55] via-[#082b82] to-[#0755b8] p-6 text-white shadow-xl shadow-blue-900/15 sm:p-8"
         >
-
           <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-
             <div>
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -180,15 +164,10 @@ export default function SuperAdminDashboard() {
             <div className="hidden h-20 w-20 items-center justify-center rounded-3xl bg-white/10 sm:flex">
               <ShieldCheck className="h-10 w-10 text-white/80" />
             </div>
-
           </div>
-
         </motion.section>
 
-        {/* Statistics */}
-
         <section className="mb-8">
-
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-display text-lg font-bold text-slate-900">
@@ -206,7 +185,6 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-
             {cards.map((card, index) => {
               const Icon = card.icon;
 
@@ -221,15 +199,12 @@ export default function SuperAdminDashboard() {
                   }}
                   className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
                 >
-
                   <div className="mb-4 flex items-center justify-between">
-
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50">
                       <Icon className="h-5 w-5 text-blue-600" />
                     </div>
 
                     <ArrowUpRight className="h-4 w-4 text-slate-300" />
-
                   </div>
 
                   <p className="text-xs font-medium text-slate-400">
@@ -243,19 +218,13 @@ export default function SuperAdminDashboard() {
                   <p className="mt-1 text-[10px] text-slate-400">
                     {card.description}
                   </p>
-
                 </motion.div>
               );
             })}
-
           </div>
-
         </section>
 
-        {/* Quick Actions */}
-
         <section className="mb-8">
-
           <div className="mb-4">
             <h3 className="font-display text-lg font-bold text-slate-900">
               Management
@@ -267,7 +236,6 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-
             {quickActions.map((action, index) => {
               const Icon = action.icon;
 
@@ -282,15 +250,13 @@ export default function SuperAdminDashboard() {
                     delay: index * 0.05,
                   }}
                   whileTap={{ scale: 0.98 }}
-                  className="group flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shado[...]
+                  className="group flex items-center gap-4 rounded-3xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
                 >
-
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50 transition group-hover:bg-blue-50">
                     <Icon className="h-5 w-5 text-slate-600 transition group-hover:text-blue-600" />
                   </div>
 
                   <div className="min-w-0 flex-1">
-
                     <p className="font-semibold text-slate-800">
                       {action.title}
                     </p>
@@ -298,27 +264,18 @@ export default function SuperAdminDashboard() {
                     <p className="mt-0.5 text-xs text-slate-400">
                       {action.description}
                     </p>
-
                   </div>
 
                   <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500" />
-
                 </motion.button>
               );
             })}
-
           </div>
-
         </section>
 
-        {/* Bottom panels */}
-
         <section className="grid gap-4 lg:grid-cols-2">
-
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
             <div className="mb-5 flex items-center justify-between">
-
               <div>
                 <h3 className="font-display font-bold text-slate-900">
                   Recent Activity
@@ -330,23 +287,17 @@ export default function SuperAdminDashboard() {
               </div>
 
               <Activity className="h-5 w-5 text-blue-500" />
-
             </div>
 
             <div className="flex min-h-[150px] items-center justify-center rounded-2xl bg-slate-50">
-
               <p className="text-xs text-slate-400">
                 No recent activity
               </p>
-
             </div>
-
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-
             <div className="mb-5 flex items-center justify-between">
-
               <div>
                 <h3 className="font-display font-bold text-slate-900">
                   System Controls
@@ -358,11 +309,9 @@ export default function SuperAdminDashboard() {
               </div>
 
               <Settings className="h-5 w-5 text-blue-500" />
-
             </div>
 
             <div className="space-y-3">
-
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left transition hover:bg-blue-50"
@@ -388,13 +337,9 @@ export default function SuperAdminDashboard() {
 
                 <ChevronRight className="h-4 w-4 text-slate-300" />
               </button>
-
             </div>
-
           </div>
-
         </section>
-
       </main>
     </div>
   );
