@@ -98,7 +98,7 @@ export default function BottomNav() {
         </div>
       </div>
 
-      {/* Super Admin access */}
+      {/* Super Admin hidden access button */}
       <button
         type="button"
         aria-label="Super Admin Login"
