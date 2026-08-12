@@ -52,6 +52,21 @@ export default function BuyData() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const [plans, setPlans] = useState<DataPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  const [selectedNetwork, setSelectedNetwork] =
+    useState('');
+
+  const [category, setCategory] =
+    useState<Category>('SME');
+
+  const [phone, setPhone] = useState('');
+  const [search, setSearch] = useState('');
+
+  const [selectedPlan, setSelectedPlan] =
+    useState<DataPlan | null>(null);
+
   const {
     showPinModal,
     pin,
@@ -65,26 +80,6 @@ export default function BuyData() {
     closeReceipt,
   } = usePurchase();
 
-  const [plans, setPlans] = useState<DataPlan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(true);
-
-  const [selectedNetwork, setSelectedNetwork] =
-    useState('');
-
-  const [category, setCategory] =
-    useState<Category>('SME');
-
-  const [phone, setPhone] = useState('');
-
-  const [search, setSearch] = useState('');
-
-  const [selectedPlan, setSelectedPlan] =
-    useState<DataPlan | null>(null);
-
-  // ==========================================
-  // FETCH DATA PLANS
-  // ==========================================
-
   useEffect(() => {
     fetchPlans();
   }, []);
@@ -92,36 +87,26 @@ export default function BuyData() {
   const fetchPlans = async () => {
     setLoadingPlans(true);
 
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('service', 'data')
-        .eq('is_active', true)
-        .order('price', {
-          ascending: true,
-        });
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('service', 'data')
+      .eq('is_active', true)
+      .order('price', { ascending: true });
 
-      if (error) {
-        console.error(
-          'Failed to load data plans:',
-          error
-        );
-        setPlans([]);
-        return;
-      }
-
-      if (data) {
-        setPlans(data as DataPlan[]);
-      }
-    } finally {
-      setLoadingPlans(false);
+    if (error) {
+      console.error(
+        'Data plans error:',
+        error.message
+      );
     }
-  };
 
-  // ==========================================
-  // FILTER PLANS
-  // ==========================================
+    if (data) {
+      setPlans(data as DataPlan[]);
+    }
+
+    setLoadingPlans(false);
+  };
 
   const filteredPlans = useMemo(() => {
     return plans.filter((plan) => {
@@ -157,83 +142,49 @@ export default function BuyData() {
     search,
   ]);
 
-  // ==========================================
-  // VALIDATION
-  // ==========================================
-
-  const cleanRecipient = phone.replace(
-    /\D/g,
-    ''
-  );
+  const normalizedPhone = phone
+    .replace(/\D/g, '')
+    .slice(0, 11);
 
   const canProceed =
     !!selectedNetwork &&
-    cleanRecipient.length === 11 &&
+    normalizedPhone.length === 11 &&
     !!selectedPlan;
 
-  // ==========================================
-  // USE MY NUMBER
-  // ==========================================
-
   const handleUseMyNumber = () => {
-    if (!user?.phone) {
+    if (!user?.phone) return;
+
+    const normalized = String(user.phone)
+      .replace(/\D/g, '');
+
+    if (normalized.startsWith('234')) {
+      setPhone(
+        `0${normalized.slice(3)}`.slice(0, 11)
+      );
       return;
     }
 
-    const number = user.phone
-      .replace(/\D/g, '')
-      .slice(-11);
-
-    setPhone(number);
+    setPhone(
+      normalized.startsWith('0')
+        ? normalized.slice(0, 11)
+        : `0${normalized}`.slice(0, 11)
+    );
   };
 
-  // ==========================================
-  // START PURCHASE
-  // ==========================================
-
   const handleProceed = () => {
-    if (!selectedPlan) {
+    if (!canProceed || !selectedPlan) {
       return;
     }
-
-    if (!selectedNetwork) {
-      return;
-    }
-
-    const recipient = phone.replace(
-      /\D/g,
-      ''
-    );
-
-    if (recipient.length !== 11) {
-      return;
-    }
-
-    /*
-     * IMPORTANT:
-     *
-     * We DO NOT deduct wallet here.
-     * We DO NOT insert a transaction here.
-     * We DO NOT verify the purchase PIN here.
-     *
-     * Everything is sent to:
-     *
-     * POST /api/purchase
-     *
-     * through usePurchase().
-     */
 
     startPurchase({
       service: 'data',
       product: selectedPlan.name,
-      amount: Number(selectedPlan.price),
-      recipient,
+      amount: selectedPlan.price,
+      recipient: normalizedPhone,
       network: selectedNetwork,
       metadata: {
-        category: selectedPlan.category,
-        plan_id: selectedPlan.id,
-        description:
-          selectedPlan.description,
+        category,
+        data_plan_id: selectedPlan.id,
       },
       productCashbackPercent:
         selectedPlan.cashback_percent,
@@ -242,57 +193,11 @@ export default function BuyData() {
 
   return (
     <div className="min-h-screen pb-32 bg-slate-50 dark:bg-slate-950">
+      {/* Header */}
+      <div className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 dark:from-primary-800 dark:via-primary-900 dark:to-slate-950 px-5 pt-10 pb-24 overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3" />
 
-      {/* ==========================================
-          HEADER
-      =========================================== */}
-
-      <div
-        className="
-          relative
-          bg-gradient-to-br
-          from-primary-600
-          via-primary-700
-          to-primary-900
-          dark:from-primary-800
-          dark:via-primary-900
-          dark:to-slate-950
-          px-5
-          pt-10
-          pb-24
-          overflow-hidden
-        "
-      >
-
-        <div
-          className="
-            absolute
-            top-0
-            right-0
-            w-64
-            h-64
-            bg-white/5
-            rounded-full
-            blur-3xl
-            -translate-y-1/3
-            translate-x-1/3
-          "
-        />
-
-        <div
-          className="
-            absolute
-            bottom-0
-            left-0
-            w-48
-            h-48
-            bg-accent-500/10
-            rounded-full
-            blur-3xl
-            translate-y-1/2
-            -translate-x-1/4
-          "
-        />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-accent-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
 
         <motion.div
           initial={{
@@ -306,91 +211,29 @@ export default function BuyData() {
           transition={{
             duration: 0.5,
           }}
-          className="
-            relative
-            flex
-            items-center
-            gap-3
-          "
+          className="relative flex items-center gap-3"
         >
-
           <button
             onClick={() => navigate(-1)}
-            className="
-              w-10
-              h-10
-              rounded-2xl
-              bg-white/10
-              backdrop-blur-md
-              flex
-              items-center
-              justify-center
-              hover:bg-white/20
-              active:scale-90
-              transition-all
-              ring-1
-              ring-white/10
-            "
+            className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/20 active:scale-90 transition-all ring-1 ring-white/10"
           >
-            <ChevronLeft
-              className="
-                w-5
-                h-5
-                text-white
-              "
-            />
+            <ChevronLeft className="w-5 h-5 text-white" />
           </button>
 
           <div className="flex-1">
-
-            <h1
-              className="
-                text-xl
-                font-bold
-                font-display
-                text-white
-              "
-            >
+            <h1 className="text-xl font-bold font-display text-white">
               Buy Data
             </h1>
 
-            <p
-              className="
-                text-white/60
-                text-xs
-              "
-            >
+            <p className="text-white/60 text-xs">
               Purchase data bundles
             </p>
-
           </div>
 
-          <div
-            className="
-              w-10
-              h-10
-              rounded-2xl
-              bg-white/10
-              backdrop-blur-md
-              flex
-              items-center
-              justify-center
-              ring-1
-              ring-white/10
-            "
-          >
-            <Smartphone
-              className="
-                w-5
-                h-5
-                text-white
-              "
-            />
+          <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center ring-1 ring-white/10">
+            <Smartphone className="w-5 h-5 text-white" />
           </div>
-
         </motion.div>
-
-        {/* BALANCE */}
 
         <motion.div
           initial={{
@@ -404,90 +247,28 @@ export default function BuyData() {
           transition={{
             delay: 0.1,
           }}
-          className="
-            relative
-            mt-5
-            flex
-            items-center
-            gap-3
-            px-4
-            py-3
-            rounded-2xl
-            bg-white/10
-            backdrop-blur-md
-            ring-1
-            ring-white/10
-          "
+          className="relative mt-5 flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/10"
         >
-
-          <div
-            className="
-              w-10
-              h-10
-              rounded-xl
-              bg-white/10
-              flex
-              items-center
-              justify-center
-            "
-          >
-            <Wallet
-              className="
-                w-5
-                h-5
-                text-white
-              "
-            />
+          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+            <Wallet className="w-4 h-4 text-white" />
           </div>
 
           <div>
-
-            <p
-              className="
-                text-white/50
-                text-[10px]
-              "
-            >
+            <p className="text-white/50 text-[10px] font-medium uppercase tracking-wider">
               Wallet Balance
             </p>
 
-            <p
-              className="
-                text-white
-                font-bold
-                text-lg
-              "
-            >
+            <p className="text-white font-bold font-display text-base">
               {formatCurrency(
-                Number(
-                  user?.wallet_balance || 0
-                )
+                user?.wallet_balance || 0
               )}
             </p>
-
           </div>
-
         </motion.div>
-
       </div>
 
-      {/* ==========================================
-          MAIN CONTENT
-      =========================================== */}
-
-      <div
-        className="
-          relative
-          -mt-14
-          px-5
-          space-y-5
-        "
-      >
-
-        {/* ==========================================
-            NETWORK
-        =========================================== */}
-
+      <div className="px-5 -mt-12 relative z-10 space-y-5">
+        {/* Network Selection */}
         <motion.div
           initial={{
             opacity: 0,
@@ -497,30 +278,15 @@ export default function BuyData() {
             opacity: 1,
             y: 0,
           }}
-          className="card-premium p-4"
+          transition={{
+            delay: 0.15,
+          }}
         >
-
-          <label
-            className="
-              block
-              text-sm
-              font-medium
-              text-slate-700
-              dark:text-slate-300
-              mb-2.5
-            "
-          >
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2.5">
             Select Network
           </label>
 
-          <div
-            className="
-              grid
-              grid-cols-4
-              gap-2
-            "
-          >
-
+          <div className="grid grid-cols-4 gap-2.5">
             {NETWORKS.map((network) => (
               <motion.button
                 key={network.id}
@@ -533,54 +299,28 @@ export default function BuyData() {
                   );
                   setSelectedPlan(null);
                 }}
-                className={`
-                  py-3
-                  rounded-xl
-                  flex
-                  flex-col
-                  items-center
-                  justify-center
-                  gap-1
-                  transition-all
-                  ${
-                    selectedNetwork ===
-                    network.id
-                      ? 'bg-primary-50 dark:bg-primary-500/10 ring-2 ring-primary-500'
-                      : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'
-                  }
-                `}
+                className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border-2 transition-all ${
+                  selectedNetwork === network.id
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 shadow-md shadow-primary-500/10'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
+                }`}
               >
-
                 <NetworkLogo
                   network={network.id}
                   size="sm"
                 />
 
-                <span
-                  className="
-                    text-[10px]
-                    font-medium
-                    text-slate-600
-                    dark:text-slate-400
-                  "
-                >
+                <span className="text-[10px] font-medium text-slate-600 dark:text-slate-400">
                   {network.name}
                 </span>
-
               </motion.button>
             ))}
-
           </div>
-
         </motion.div>
 
         {selectedNetwork && (
           <>
-
-            {/* ======================================
-                PHONE
-            ======================================= */}
-
+            {/* Phone Number */}
             <motion.div
               initial={{
                 opacity: 0,
@@ -590,129 +330,61 @@ export default function BuyData() {
                 opacity: 1,
                 y: 0,
               }}
-              className="card-premium p-4"
             >
-
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-                  mb-2.5
-                "
-              >
-
-                <label
-                  className="
-                    block
-                    text-sm
-                    font-medium
-                    text-slate-700
-                    dark:text-slate-300
-                  "
-                >
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Phone Number
                 </label>
 
                 <button
+                  type="button"
                   onClick={
                     handleUseMyNumber
                   }
-                  className="
-                    text-xs
-                    font-semibold
-                    text-primary-600
-                    dark:text-primary-400
-                    flex
-                    items-center
-                    gap-1
-                  "
+                  className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors flex items-center gap-1"
                 >
-                  <Sparkles
-                    className="
-                      w-3
-                      h-3
-                    "
-                  />
+                  <Sparkles className="w-3 h-3" />
                   Use My Number
                 </button>
-
               </div>
 
               <div className="relative">
-
-                <span
-                  className="
-                    absolute
-                    left-4
-                    top-1/2
-                    -translate-y-1/2
-                    text-slate-400
-                    text-sm
-                    font-medium
-                    pointer-events-none
-                  "
-                >
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm font-medium pointer-events-none">
                   +234
                 </span>
 
                 <input
                   type="tel"
                   inputMode="numeric"
-                  placeholder="8012345678"
+                  placeholder="801 234 5678"
                   value={phone}
                   maxLength={11}
                   onChange={(event) =>
                     setPhone(
                       event.target.value
-                        .replace(
-                          /[^0-9]/g,
-                          ''
-                        )
+                        .replace(/\D/g, '')
                         .slice(0, 11)
                     )
                   }
-                  className="
-                    w-full
-                    pl-12
-                    pr-4
-                    py-3.5
-                    rounded-2xl
-                    bg-slate-50
-                    dark:bg-slate-800/50
-                    border
-                    border-slate-200
-                    dark:border-slate-700
-                    text-slate-900
-                    dark:text-slate-100
-                    focus:outline-none
-                    focus:ring-2
-                    focus:ring-primary-500
-                    focus:border-transparent
-                  "
+                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                 />
-
               </div>
 
-              {phone.length > 0 &&
-                phone.length !== 11 && (
-                  <p
-                    className="
-                      text-xs
-                      text-amber-500
-                      mt-2
-                    "
-                  >
-                    Enter 11 digits
+              <p className="text-[11px] text-slate-400 mt-2">
+                Enter an 11-digit Nigerian phone
+                number.
+              </p>
+
+              {normalizedPhone.length > 0 &&
+                normalizedPhone.length !== 11 && (
+                  <p className="text-[11px] text-red-500 mt-1">
+                    Phone number must contain 11
+                    digits.
                   </p>
                 )}
-
             </motion.div>
 
-            {/* ======================================
-                CATEGORY
-            ======================================= */}
-
+            {/* Data Category */}
             <motion.div
               initial={{
                 opacity: 0,
@@ -722,65 +394,35 @@ export default function BuyData() {
                 opacity: 1,
                 y: 0,
               }}
-              className="card-premium p-4"
             >
-
-              <label
-                className="
-                  block
-                  text-sm
-                  font-medium
-                  text-slate-700
-                  dark:text-slate-300
-                  mb-2.5
-                "
-              >
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2.5">
                 Data Category
               </label>
 
-              <div
-                className="
-                  grid
-                  grid-cols-4
-                  gap-2
-                "
-              >
-
-                {CATEGORIES.map((cat) => (
+              <div className="grid grid-cols-4 gap-2">
+                {CATEGORIES.map((item) => (
                   <motion.button
-                    key={cat}
+                    key={item}
                     whileTap={{
                       scale: 0.92,
                     }}
                     onClick={() => {
-                      setCategory(cat);
+                      setCategory(item);
                       setSelectedPlan(null);
                     }}
-                    className={`
-                      py-2.5
-                      rounded-xl
-                      text-xs
-                      font-bold
-                      transition-all
-                      ${
-                        category === cat
-                          ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
-                          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                      }
-                    `}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      category === item
+                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                    }`}
                   >
-                    {cat}
+                    {item}
                   </motion.button>
                 ))}
-
               </div>
-
             </motion.div>
 
-            {/* ======================================
-                PLANS
-            ======================================= */}
-
+            {/* Plan Selector */}
             <motion.div
               initial={{
                 opacity: 0,
@@ -790,40 +432,13 @@ export default function BuyData() {
                 opacity: 1,
                 y: 0,
               }}
-              className="card-premium p-4"
             >
-
-              <label
-                className="
-                  block
-                  text-sm
-                  font-medium
-                  text-slate-700
-                  dark:text-slate-300
-                  mb-2.5
-                "
-              >
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2.5">
                 Select Data Plan
               </label>
 
-              <div
-                className="
-                  relative
-                  mb-3
-                "
-              >
-
-                <Search
-                  className="
-                    absolute
-                    left-4
-                    top-1/2
-                    -translate-y-1/2
-                    w-4
-                    h-4
-                    text-slate-400
-                  "
-                />
+              <div className="relative mb-3">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
 
                 <input
                   type="text"
@@ -834,182 +449,64 @@ export default function BuyData() {
                       event.target.value
                     )
                   }
-                  className="
-                    w-full
-                    pl-11
-                    pr-4
-                    py-3
-                    rounded-2xl
-                    bg-slate-50
-                    dark:bg-slate-800/50
-                    border
-                    border-slate-200
-                    dark:border-slate-700
-                    text-slate-900
-                    dark:text-slate-100
-                    text-sm
-                    focus:outline-none
-                    focus:ring-2
-                    focus:ring-primary-500
-                  "
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-sm"
                 />
-
               </div>
 
-              <div
-                className="
-                  grid
-                  grid-cols-2
-                  gap-2.5
-                  max-h-72
-                  overflow-y-auto
-                "
-              >
-
+              <div className="grid grid-cols-2 gap-2.5 max-h-72 overflow-y-auto">
                 {loadingPlans ? (
-
-                  <div
-                    className="
-                      col-span-2
-                      text-center
-                      py-8
-                    "
-                  >
-                    <div
-                      className="
-                        w-6
-                        h-6
-                        border-2
-                        border-primary-500
-                        border-t-transparent
-                        rounded-full
-                        mx-auto
-                        animate-spin
-                      "
-                    />
+                  <div className="col-span-2 text-center py-8">
+                    <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto animate-spin" />
                   </div>
-
                 ) : filteredPlans.length === 0 ? (
-
-                  <div
-                    className="
-                      col-span-2
-                      text-center
-                      py-8
-                      text-sm
-                      text-slate-400
-                    "
-                  >
-                    No plans available for
-                    this selection
+                  <div className="col-span-2 text-center py-8 text-sm text-slate-400 dark:text-slate-500">
+                    No plans available for this
+                    selection
                   </div>
-
                 ) : (
+                  filteredPlans.map((plan) => (
+                    <motion.button
+                      key={plan.id}
+                      whileTap={{
+                        scale: 0.96,
+                      }}
+                      onClick={() =>
+                        setSelectedPlan(plan)
+                      }
+                      className={`relative p-3.5 rounded-2xl border-2 transition-all text-left ${
+                        selectedPlan?.id ===
+                        plan.id
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary-300'
+                      }`}
+                    >
+                      {selectedPlan?.id ===
+                        plan.id && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      )}
 
-                  filteredPlans.map(
-                    (plan) => (
-                      <motion.button
-                        key={plan.id}
-                        whileTap={{
-                          scale: 0.96,
-                        }}
-                        onClick={() =>
-                          setSelectedPlan(
-                            plan
-                          )
-                        }
-                        className={`
-                          relative
-                          p-3.5
-                          rounded-2xl
-                          border-2
-                          transition-all
-                          text-left
-                          ${
-                            selectedPlan?.id ===
-                            plan.id
-                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10'
-                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
-                          }
-                        `}
-                      >
+                      <p className="font-bold text-slate-800 dark:text-slate-100 text-sm pr-6">
+                        {plan.name}
+                      </p>
 
-                        {selectedPlan?.id ===
-                          plan.id && (
-                          <div
-                            className="
-                              absolute
-                              top-2
-                              right-2
-                              w-5
-                              h-5
-                              rounded-full
-                              bg-primary-500
-                              flex
-                              items-center
-                              justify-center
-                            "
-                          >
-                            <Check
-                              className="
-                                w-3
-                                h-3
-                                text-white
-                              "
-                            />
-                          </div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {plan.description}
+                      </p>
+
+                      <p className="text-lg font-bold text-primary-600 dark:text-primary-400 mt-1.5">
+                        {formatCurrency(
+                          plan.price
                         )}
-
-                        <p
-                          className="
-                            font-bold
-                            text-slate-800
-                            dark:text-slate-100
-                            text-sm
-                            pr-6
-                          "
-                        >
-                          {plan.name}
-                        </p>
-
-                        <p
-                          className="
-                            text-[11px]
-                            text-slate-400
-                            mt-0.5
-                          "
-                        >
-                          {plan.description}
-                        </p>
-
-                        <p
-                          className="
-                            text-lg
-                            font-bold
-                            text-primary-600
-                            dark:text-primary-400
-                            mt-1.5
-                          "
-                        >
-                          {formatCurrency(
-                            plan.price
-                          )}
-                        </p>
-
-                      </motion.button>
-                    )
-                  )
-
+                      </p>
+                    </motion.button>
+                  ))
                 )}
-
               </div>
-
             </motion.div>
 
-            {/* ======================================
-                AMOUNT
-            ======================================= */}
-
+            {/* Amount */}
             {selectedPlan && (
               <motion.div
                 initial={{
@@ -1020,75 +517,32 @@ export default function BuyData() {
                   opacity: 1,
                   y: 0,
                 }}
-                className="card-premium p-4"
               >
-
-                <label
-                  className="
-                    block
-                    text-sm
-                    font-medium
-                    text-slate-700
-                    dark:text-slate-300
-                    mb-2.5
-                  "
-                >
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2.5">
                   Amount
                 </label>
 
                 <div className="relative">
-
-                  <span
-                    className="
-                      absolute
-                      left-4
-                      top-1/2
-                      -translate-y-1/2
-                      text-slate-400
-                      text-sm
-                      font-medium
-                    "
-                  >
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">
                     ₦
                   </span>
 
                   <input
                     type="text"
                     readOnly
-                    value={Number(
-                      selectedPlan.price
-                    ).toFixed(2)}
-                    className="
-                      w-full
-                      pl-8
-                      pr-4
-                      py-3.5
-                      rounded-2xl
-                      bg-slate-100
-                      dark:bg-slate-800/30
-                      border
-                      border-slate-200
-                      dark:border-slate-700
-                      text-slate-500
-                      dark:text-slate-400
-                      font-semibold
-                    "
+                    value={selectedPlan.price.toFixed(
+                      2
+                    )}
+                    className="w-full pl-8 pr-4 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold cursor-not-allowed"
                   />
-
                 </div>
-
               </motion.div>
             )}
-
           </>
         )}
-
       </div>
 
-      {/* ==========================================
-          PURCHASE BAR
-      =========================================== */}
-
+      {/* Sticky Purchase Bar */}
       <AnimatePresence>
         {canProceed && (
           <motion.div
@@ -1104,94 +558,36 @@ export default function BuyData() {
               opacity: 0,
               y: 40,
             }}
-            className="
-              fixed
-              bottom-20
-              left-0
-              right-0
-              px-5
-              z-40
-              sm:max-w-md
-              sm:left-1/2
-              sm:-translate-x-1/2
-            "
+            transition={{
+              type: 'spring',
+              damping: 28,
+              stiffness: 320,
+            }}
+            className="fixed bottom-20 left-0 right-0 px-5 z-40 sm:max-w-md sm:left-1/2 sm:-translate-x-1/2"
           >
-
-            <div
-              className="
-                card-premium
-                p-4
-                shadow-2xl
-              "
-            >
-
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-                  mb-3
-                "
-              >
-
+            <div className="card-premium p-4 shadow-2xl">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-
-                  <p
-                    className="
-                      text-xs
-                      text-slate-400
-                    "
-                  >
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     Total Amount
                   </p>
 
-                  <p
-                    className="
-                      text-xl
-                      font-bold
-                      text-slate-900
-                      dark:text-white
-                      font-display
-                    "
-                  >
+                  <p className="text-xl font-bold text-slate-900 dark:text-white font-display">
                     {formatCurrency(
-                      selectedPlan?.price ||
-                        0
+                      selectedPlan?.price || 0
                     )}
                   </p>
-
                 </div>
 
-                <div
-                  className="
-                    text-right
-                    max-w-[50%]
-                  "
-                >
-
-                  <p
-                    className="
-                      text-xs
-                      text-slate-400
-                    "
-                  >
+                <div className="text-right max-w-[50%]">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
                     Plan
                   </p>
 
-                  <p
-                    className="
-                      text-sm
-                      font-semibold
-                      text-slate-700
-                      dark:text-slate-200
-                      truncate
-                    "
-                  >
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
                     {selectedPlan?.name}
                   </p>
-
                 </div>
-
               </div>
 
               <Button
@@ -1200,31 +596,17 @@ export default function BuyData() {
                 onClick={handleProceed}
               >
                 Purchase Data
-
-                <ArrowRight
-                  className="
-                    w-4
-                    h-4
-                  "
-                />
+                <ArrowRight className="w-4 h-4" />
               </Button>
-
             </div>
-
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ==========================================
-          PURCHASE PIN
-      =========================================== */}
-
       <PurchasePinModal
         open={showPinModal}
         onClose={closePinModal}
-        amount={
-          selectedPlan?.price || 0
-        }
+        amount={selectedPlan?.price || 0}
         productName={
           selectedPlan?.name || ''
         }
@@ -1232,14 +614,8 @@ export default function BuyData() {
         setPin={setPin}
         pinError={pinError}
         stage={stage}
-        onPinComplete={
-          handlePinComplete
-        }
+        onPinComplete={handlePinComplete}
       />
-
-      {/* ==========================================
-          RECEIPT
-      =========================================== */}
 
       <AnimatePresence>
         {receipt && (
@@ -1252,7 +628,6 @@ export default function BuyData() {
           />
         )}
       </AnimatePresence>
-
     </div>
   );
 }
