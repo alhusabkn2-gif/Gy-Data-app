@@ -1,17 +1,23 @@
-import { useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import {
   Activity,
   ArrowDownToLine,
   ArrowUpRight,
   BarChart3,
   Bell,
+  Check,
   ChevronRight,
   CreditCard,
   Database,
   LogOut,
   Menu,
+  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
@@ -38,6 +44,31 @@ type NavItem = {
   id: Section;
   label: string;
   icon: typeof Users;
+};
+
+type FundingRequest = {
+  id: string;
+  phone: string;
+  amount: number | string;
+  status: string;
+  payment_method?: string | null;
+  payment_reference?: string | null;
+  notes?: string | null;
+  admin_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  approved_at?: string | null;
+};
+
+type FundingResponse = {
+  success?: boolean;
+  data?: FundingRequest[];
+  message?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+  };
 };
 
 const navItems: NavItem[] = [
@@ -99,20 +130,50 @@ const sectionInfo: Record<
   },
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+function formatCurrency(value: number | string | null | undefined) {
+  const amount = Number(value || 0);
+
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '—';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return date.toLocaleString('en-NG', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 function ActionButton({
   children,
   onClick,
   className = '',
+  disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition active:scale-95 ${className}`}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -242,69 +303,196 @@ export default function SuperAdminDashboard() {
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
 
-  const [users, setUsers] = useState<any[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
+  const [fundingRequests, setFundingRequests] = useState<
+    FundingRequest[]
+  >([]);
+
+  const [fundingLoading, setFundingLoading] = useState(false);
+
+  const [fundingActionId, setFundingActionId] = useState<
+    string | null
+  >(null);
+
+  const [fundingError, setFundingError] = useState('');
+
+  const [fundingLoaded, setFundingLoaded] = useState(false);
+
+  const goTo = (next: Section) => {
+    setSection(next);
+    setMobileMenu(false);
+    setSearch('');
+  };
 
   const showNotice = (text: string) => {
     setNotice(text);
 
     window.setTimeout(() => {
       setNotice('');
-    }, 2500);
-  };
-
-  const fetchUsers = async () => {
-    setUsersLoading(true);
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(
-        'Super Admin users error:',
-        error.message
-      );
-
-      showNotice('Unable to load users');
-      setUsers([]);
-    } else {
-      setUsers(data || []);
-    }
-
-    setUsersLoading(false);
-  };
-
-  const goTo = (next: Section) => {
-    setSection(next);
-    setMobileMenu(false);
-    setSearch('');
-
-    if (next === 'users') {
-      void fetchUsers();
-    }
+    }, 3000);
   };
 
   const logout = () => {
     localStorage.removeItem('gydata_super_admin');
-    localStorage.removeItem(
-      'gydata_super_admin_session'
+    localStorage.removeItem('gydata_super_admin_session');
+    navigate('/super-admin-login', { replace: true });
+  };
+
+  const loadFundingRequests = useCallback(async () => {
+    setFundingLoading(true);
+    setFundingError('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/funding/requests?status=pending&limit=100`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const result: FundingResponse = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to load funding requests.'
+        );
+      }
+
+      setFundingRequests(
+        Array.isArray(result.data) ? result.data : []
+      );
+
+      setFundingLoaded(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to load funding requests.';
+
+      setFundingError(message);
+      setFundingRequests([]);
+    } finally {
+      setFundingLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (section === 'funding' || section === 'wallet') {
+      void loadFundingRequests();
+    }
+  }, [section, loadFundingRequests]);
+
+  const processFundingRequest = async (
+    requestId: string,
+    action: 'approve' | 'reject'
+  ) => {
+    if (fundingActionId) {
+      return;
+    }
+
+    const request = fundingRequests.find(
+      (item) => item.id === requestId
     );
 
-    navigate('/super-admin-login', {
-      replace: true,
-    });
+    if (!request) {
+      showNotice('Funding request is no longer available.');
+      return;
+    }
+
+    const actionLabel =
+      action === 'approve' ? 'approve' : 'reject';
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${actionLabel} this funding request?\n\n` +
+        `Phone: ${request.phone}\n` +
+        `Amount: ${formatCurrency(request.amount)}`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setFundingActionId(requestId);
+    setFundingError('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/funding/${action}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            requestId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message ||
+            `Failed to ${actionLabel} funding request.`
+        );
+      }
+
+      showNotice(
+        action === 'approve'
+          ? 'Funding approved and wallet credited successfully.'
+          : 'Funding request rejected successfully.'
+      );
+
+      await loadFundingRequests();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : `Failed to ${actionLabel} funding request.`;
+
+      setFundingError(message);
+      showNotice(message);
+    } finally {
+      setFundingActionId(null);
+    }
   };
+
+  const pendingAmount = fundingRequests.reduce(
+    (total, request) => total + Number(request.amount || 0),
+    0
+  );
+
+  const filteredFundingRequests = fundingRequests.filter(
+    (request) => {
+      const query = search.trim().toLowerCase();
+
+      if (!query) {
+        return true;
+      }
+
+      return [
+        request.phone,
+        request.payment_reference,
+        request.payment_method,
+        request.notes,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(query)
+        );
+    }
+  );
 
   const renderOverview = () => (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SmallCard
           title="Users"
-          value={String(users.length)}
+          value="0"
           subtitle="Registered users"
           icon={Users}
           onClick={() => goTo('users')}
@@ -429,32 +617,32 @@ export default function SuperAdminDashboard() {
 
           <div className="mt-4 space-y-2">
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                Access
-              </span>
-
+              <span className="text-slate-500">Access</span>
               <span className="font-bold text-slate-800">
                 Super Admin
               </span>
             </div>
 
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                System
-              </span>
-
+              <span className="text-slate-500">System</span>
               <span className="font-bold text-emerald-600">
                 Online
               </span>
             </div>
 
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                Security
-              </span>
-
+              <span className="text-slate-500">Security</span>
               <span className="font-bold text-blue-600">
                 Protected
+              </span>
+            </div>
+
+            <div className="flex justify-between py-2 text-xs">
+              <span className="text-slate-500">
+                Pending Funding
+              </span>
+              <span className="font-bold text-amber-600">
+                {fundingRequests.length}
               </span>
             </div>
           </div>
@@ -468,276 +656,77 @@ export default function SuperAdminDashboard() {
           </ActionButton>
         </div>
       </div>
+    </div>
+  );
+
+  const renderUsers = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <SmallCard
+          title="All Users"
+          value="0"
+          subtitle="Registered"
+          icon={Users}
+          onClick={() => showNotice('User management is next.')}
+        />
+
+        <SmallCard
+          title="Active"
+          value="0"
+          subtitle="Active accounts"
+          icon={UserCheck}
+          onClick={() => showNotice('User management is next.')}
+        />
+
+        <SmallCard
+          title="Suspended"
+          value="0"
+          subtitle="Suspended accounts"
+          icon={UserX}
+          onClick={() => showNotice('User management is next.')}
+        />
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-black text-slate-900">
-              Recent Activity
+              User Directory
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Latest system activity will appear here.
+              User management will be connected in the next
+              isolated fix.
             </p>
           </div>
 
-          <ActionButton
-            onClick={() => goTo('security')}
-            className="bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            View Logs
-            <ChevronRight className="h-3.5 w-3.5" />
-          </ActionButton>
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search user..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
+            />
+          </div>
         </div>
 
-        <div className="mt-4 rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-500">
-          No activity records loaded yet.
+        <div className="mt-4">
+          <EmptyPanel
+            icon={Users}
+            title="User management is next"
+            text="This section has intentionally not been changed while we connect manual funding safely."
+            onClick={() =>
+              showNotice(
+                'User management will be connected next.'
+              )
+            }
+          />
         </div>
       </div>
     </div>
   );
-
-  const renderUsers = () => {
-    const query = search.trim().toLowerCase();
-
-    const filteredUsers = users.filter((item) => {
-      const name = String(
-        item.full_name ||
-          item.name ||
-          item.username ||
-          ''
-      ).toLowerCase();
-
-      const phone = String(
-        item.phone || ''
-      ).toLowerCase();
-
-      const email = String(
-        item.email || ''
-      ).toLowerCase();
-
-      return (
-        !query ||
-        name.includes(query) ||
-        phone.includes(query) ||
-        email.includes(query)
-      );
-    });
-
-    const activeUsers = users.filter((item) => {
-      const status = String(
-        item.status || ''
-      ).toLowerCase();
-
-      return (
-        item.is_active !== false &&
-        status !== 'suspended' &&
-        status !== 'inactive'
-      );
-    });
-
-    const suspendedUsers = users.filter((item) => {
-      const status = String(
-        item.status || ''
-      ).toLowerCase();
-
-      return (
-        item.is_active === false ||
-        status === 'suspended' ||
-        status === 'inactive'
-      );
-    });
-
-    const money = (value: unknown) =>
-      `₦${Number(value || 0).toLocaleString(
-        'en-NG',
-        {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }
-      )}`;
-
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <SmallCard
-            title="All Users"
-            value={String(users.length)}
-            subtitle="Registered"
-            icon={Users}
-            onClick={() => setSearch('')}
-          />
-
-          <SmallCard
-            title="Active"
-            value={String(
-              activeUsers.length
-            )}
-            subtitle="Active accounts"
-            icon={UserCheck}
-            onClick={() => setSearch('')}
-          />
-
-          <SmallCard
-            title="Suspended"
-            value={String(
-              suspendedUsers.length
-            )}
-            subtitle="Suspended accounts"
-            icon={UserX}
-            onClick={() => setSearch('')}
-          />
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black text-slate-900">
-                User Directory
-              </h2>
-
-              <p className="mt-1 text-[10px] text-slate-500">
-                Search real customer accounts
-                from Supabase.
-              </p>
-            </div>
-
-            <div className="flex w-full gap-2 sm:w-auto">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-
-                <input
-                  value={search}
-                  onChange={(e) =>
-                    setSearch(e.target.value)
-                  }
-                  placeholder="Search name, phone or email..."
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
-                />
-              </div>
-
-              <ActionButton
-                onClick={() =>
-                  void fetchUsers()
-                }
-                className="shrink-0 bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Refresh
-              </ActionButton>
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            {usersLoading ? (
-              <div className="rounded-lg bg-slate-50 p-8 text-center text-xs text-slate-500">
-                Loading users...
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <EmptyPanel
-                icon={Users}
-                title="No user records found"
-                text={
-                  query
-                    ? `No users match "${search}".`
-                    : 'No customer accounts are currently available.'
-                }
-                onClick={() =>
-                  void fetchUsers()
-                }
-              />
-            ) : (
-              <div className="min-w-[760px] overflow-hidden rounded-lg border border-slate-200">
-                <div className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-400">
-                  <span>User</span>
-                  <span>Phone</span>
-                  <span>Wallet</span>
-                  <span>Cashback</span>
-                  <span>Status</span>
-                </div>
-
-                {filteredUsers.map((item) => {
-                  const name =
-                    item.full_name ||
-                    item.name ||
-                    item.username ||
-                    'Customer';
-
-                  const status = String(
-                    item.status || ''
-                  ).toLowerCase();
-
-                  const suspended =
-                    item.is_active === false ||
-                    status === 'suspended' ||
-                    status === 'inactive';
-
-                  return (
-                    <div
-                      key={
-                        item.id ||
-                        item.phone
-                      }
-                      className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-t border-slate-100 px-4 py-3 text-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-bold text-slate-800">
-                          {name}
-                        </p>
-
-                        <p className="truncate text-[10px] text-slate-400">
-                          {item.email ||
-                            'No email'}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center text-slate-600">
-                        {item.phone || '—'}
-                      </div>
-
-                      <div className="flex items-center font-bold text-slate-800">
-                        {money(
-                          item.wallet_balance
-                        )}
-                      </div>
-
-                      <div className="flex items-center font-bold text-emerald-600">
-                        {money(
-                          item.cashback_balance
-                        )}
-                      </div>
-
-                      <div className="flex items-center">
-                        <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-bold ${
-                            suspended
-                              ? 'bg-red-50 text-red-600'
-                              : 'bg-emerald-50 text-emerald-600'
-                          }`}
-                        >
-                          {suspended
-                            ? 'Suspended'
-                            : 'Active'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {!usersLoading &&
-            filteredUsers.length > 0 && (
-              <p className="mt-3 text-[10px] text-slate-400">
-                Showing{' '}
-                {filteredUsers.length} of{' '}
-                {users.length} users.
-              </p>
-            )}
-        </div>
-      </div>
-    );
-  };
 
   const renderWallet = () => (
     <div className="space-y-4">
@@ -749,23 +738,23 @@ export default function SuperAdminDashboard() {
           icon={Wallet}
           onClick={() =>
             showNotice(
-              'Wallet balance selected'
+              'Customer wallet data will be connected next.'
             )
           }
         />
 
         <SmallCard
           title="Pending"
-          value="0"
+          value={String(fundingRequests.length)}
           subtitle="Funding reviews"
           icon={ArrowDownToLine}
           onClick={() => goTo('funding')}
         />
 
         <SmallCard
-          title="Funding"
-          value="₦0"
-          subtitle="Manual funding"
+          title="Pending Value"
+          value={formatCurrency(pendingAmount)}
+          subtitle="Awaiting approval"
           icon={Database}
           onClick={() => goTo('funding')}
         />
@@ -779,30 +768,19 @@ export default function SuperAdminDashboard() {
 
           <div className="mt-4 space-y-2">
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                Bank
-              </span>
-
-              <span className="font-bold">
-                PalmPay
-              </span>
+              <span className="text-slate-500">Bank</span>
+              <span className="font-bold">PalmPay</span>
             </div>
 
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
               <span className="text-slate-500">
                 Account Number
               </span>
-
-              <span className="font-bold">
-                9550627002
-              </span>
+              <span className="font-bold">9550627002</span>
             </div>
 
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                Account Name
-              </span>
-
+              <span className="text-slate-500">Account Name</span>
               <span className="text-right font-bold">
                 Abdurrahman Yahaya Ibrahim
               </span>
@@ -814,30 +792,55 @@ export default function SuperAdminDashboard() {
               onClick={() => goTo('funding')}
               className="bg-blue-600 text-white hover:bg-blue-700"
             >
-              Funding Accounts
+              Funding Requests
             </ActionButton>
 
             <ActionButton
-              onClick={() =>
-                goTo('transactions')
-              }
+              onClick={() => void loadFundingRequests()}
+              disabled={fundingLoading}
               className="bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
-              Transactions
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${
+                  fundingLoading ? 'animate-spin' : ''
+                }`}
+              />
+              Refresh
             </ActionButton>
           </div>
         </div>
 
-        <EmptyPanel
-          icon={Wallet}
-          title="Wallet records not connected"
-          text="Wallet operations are ready for connection to live wallet data."
-          onClick={() =>
-            showNotice(
-              'Wallet refresh requested'
-            )
-          }
-        />
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-black text-slate-900">
+            Pending Manual Funding
+          </h2>
+
+          <p className="mt-1 text-[10px] text-slate-500">
+            Requests waiting for Super Admin review.
+          </p>
+
+          <div className="mt-4 flex items-center justify-between rounded-lg bg-blue-50 p-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">
+                Requests
+              </p>
+
+              <p className="mt-1 text-2xl font-black text-slate-900">
+                {fundingRequests.length}
+              </p>
+            </div>
+
+            <ArrowDownToLine className="h-6 w-6 text-blue-600" />
+          </div>
+
+          <ActionButton
+            onClick={() => goTo('funding')}
+            className="mt-4 w-full bg-[#061337] text-white hover:bg-[#0b1d4d]"
+          >
+            Review Funding Requests
+            <ChevronRight className="h-3.5 w-3.5" />
+          </ActionButton>
+        </div>
       </div>
     </div>
   );
@@ -852,44 +855,19 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Search and filter platform
-              transactions.
+              Transaction management will be connected next.
             </p>
-          </div>
-
-          <div className="flex gap-2">
-            <ActionButton
-              onClick={() =>
-                showNotice(
-                  'Transaction filters opened'
-                )
-              }
-              className="bg-slate-100 text-slate-700 hover:bg-slate-200"
-            >
-              Filters
-            </ActionButton>
-
-            <ActionButton
-              onClick={() =>
-                showNotice(
-                  'Transaction export requested'
-                )
-              }
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Export
-            </ActionButton>
           </div>
         </div>
 
         <div className="mt-4">
           <EmptyPanel
             icon={CreditCard}
-            title="No transactions loaded"
-            text="Transaction records will appear here when connected to the transaction source."
+            title="Transaction management is next"
+            text="This section has intentionally not been changed while manual funding is being connected."
             onClick={() =>
               showNotice(
-                'Transaction refresh requested'
+                'Transaction management will be connected next.'
               )
             }
           />
@@ -907,7 +885,7 @@ export default function SuperAdminDashboard() {
           subtitle="Total recorded"
           icon={ArrowUpRight}
           onClick={() =>
-            showNotice('Revenue selected')
+            showNotice('Revenue analytics will be connected next.')
           }
         />
 
@@ -917,7 +895,7 @@ export default function SuperAdminDashboard() {
           subtitle="Today revenue"
           icon={BarChart3}
           onClick={() =>
-            showNotice('Today selected')
+            showNotice('Revenue analytics will be connected next.')
           }
         />
 
@@ -927,7 +905,7 @@ export default function SuperAdminDashboard() {
           subtitle="Monthly revenue"
           icon={BarChart3}
           onClick={() =>
-            showNotice('Monthly selected')
+            showNotice('Revenue analytics will be connected next.')
           }
         />
 
@@ -936,20 +914,16 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Revenue records"
           icon={CreditCard}
-          onClick={() =>
-            goTo('transactions')
-          }
+          onClick={() => goTo('transactions')}
         />
       </div>
 
       <EmptyPanel
         icon={BarChart3}
-        title="Statistics ready"
-        text="Revenue analytics will populate when connected to transaction data."
+        title="Revenue analytics is next"
+        text="Revenue statistics will be connected after the funding workflow is verified."
         onClick={() =>
-          showNotice(
-            'Statistics refresh requested'
-          )
+          showNotice('Revenue analytics will be connected next.')
         }
       />
     </div>
@@ -957,70 +931,287 @@ export default function SuperAdminDashboard() {
 
   const renderFunding = () => (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <SmallCard
+          title="Pending Requests"
+          value={String(fundingRequests.length)}
+          subtitle="Awaiting review"
+          icon={ArrowDownToLine}
+          onClick={() => void loadFundingRequests()}
+        />
+
+        <SmallCard
+          title="Pending Amount"
+          value={formatCurrency(pendingAmount)}
+          subtitle="Total awaiting approval"
+          icon={Wallet}
+          onClick={() => void loadFundingRequests()}
+        />
+
+        <SmallCard
+          title="Status"
+          value={fundingLoading ? 'Loading' : 'Live'}
+          subtitle="Funding API"
+          icon={Activity}
+          onClick={() => void loadFundingRequests()}
+        />
+
+        <SmallCard
+          title="Manual"
+          value="ON"
+          subtitle="Manual funding"
+          icon={Database}
+          onClick={() =>
+            showNotice('Manual funding is enabled.')
+          }
+        />
+      </div>
+
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-sm font-black text-slate-900">
-              Funding Accounts
+              Pending Funding Requests
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Accounts used for manual wallet
-              funding.
+              Review customer payment references before approving
+              wallet credit.
             </p>
           </div>
 
-          <ActionButton
-            onClick={() =>
-              showNotice(
-                'Add funding account opened'
-              )
-            }
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Add Account
-          </ActionButton>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search phone/reference..."
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400 sm:w-[230px]"
+              />
+            </div>
+
+            <ActionButton
+              onClick={() => void loadFundingRequests()}
+              disabled={fundingLoading}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${
+                  fundingLoading ? 'animate-spin' : ''
+                }`}
+              />
+              Refresh
+            </ActionButton>
+          </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() =>
-            showNotice(
-              'PalmPay account details opened'
-            )
-          }
-          className="mt-4 flex w-full items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-left transition hover:bg-blue-100"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
-            <Database className="h-4 w-4" />
+        {fundingError && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+            {fundingError}
           </div>
+        )}
 
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">
-              Primary Account
-            </p>
+        {!fundingLoading &&
+          fundingLoaded &&
+          filteredFundingRequests.length === 0 && (
+            <div className="mt-4">
+              <EmptyPanel
+                icon={Check}
+                title={
+                  search
+                    ? 'No matching funding requests'
+                    : 'No pending funding requests'
+                }
+                text={
+                  search
+                    ? `Nothing matches "${search}".`
+                    : 'There are currently no pending manual funding requests.'
+                }
+                onClick={() => void loadFundingRequests()}
+                buttonText="Refresh"
+              />
+            </div>
+          )}
 
-            <p className="mt-1 text-sm font-black text-slate-900">
-              PalmPay
-            </p>
+        {fundingLoading && (
+          <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-8 text-center">
+            <RefreshCw className="mx-auto h-5 w-5 animate-spin text-blue-600" />
 
-            <p className="mt-1 text-[10px] text-slate-600">
-              9550627002 · Abdurrahman Yahaya
-              Ibrahim
+            <p className="mt-3 text-xs font-semibold text-slate-500">
+              Loading pending funding requests...
             </p>
           </div>
+        )}
 
-          <ChevronRight className="h-4 w-4 text-blue-500" />
-        </button>
+        {!fundingLoading &&
+          filteredFundingRequests.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {filteredFundingRequests.map((request) => {
+                const busy =
+                  fundingActionId === request.id;
+
+                return (
+                  <div
+                    key={request.id}
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">
+                            PENDING
+                          </span>
+
+                          <span className="text-[10px] text-slate-400">
+                            {formatDate(request.created_at)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Customer
+                            </p>
+
+                            <p className="mt-1 text-xs font-black text-slate-900">
+                              {request.phone}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Amount
+                            </p>
+
+                            <p className="mt-1 text-sm font-black text-blue-700">
+                              {formatCurrency(request.amount)}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Payment Method
+                            </p>
+
+                            <p className="mt-1 text-xs font-bold text-slate-800">
+                              {request.payment_method ||
+                                'Manual'}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Payment Reference
+                            </p>
+
+                            <p className="mt-1 break-all text-xs font-bold text-slate-800">
+                              {request.payment_reference ||
+                                '—'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {request.notes && (
+                          <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Customer Note
+                            </p>
+
+                            <p className="mt-1 text-xs leading-5 text-slate-600">
+                              {request.notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 flex-col gap-2 sm:flex-row xl:flex-col">
+                        <ActionButton
+                          onClick={() =>
+                            void processFundingRequest(
+                              request.id,
+                              'approve'
+                            )
+                          }
+                          disabled={busy}
+                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          {busy ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          Approve
+                        </ActionButton>
+
+                        <ActionButton
+                          onClick={() =>
+                            void processFundingRequest(
+                              request.id,
+                              'reject'
+                            )
+                          }
+                          disabled={busy}
+                          className="bg-red-50 text-red-700 hover:bg-red-100"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Reject
+                        </ActionButton>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
       </div>
 
-      <EmptyPanel
-        icon={ArrowDownToLine}
-        title="Funding activity"
-        text="Funding activity and approval records will appear here."
-        onClick={() => goTo('wallet')}
-        buttonText="Open Wallet"
-      />
+      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+
+          <div>
+            <h3 className="text-xs font-black text-slate-900">
+              Funding safety
+            </h3>
+
+            <p className="mt-1 text-[10px] leading-5 text-slate-600">
+              Approval is processed by the backend RPC. The
+              database checks that the request is still pending
+              before crediting the wallet, creating the
+              transaction and marking the request approved.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-black text-slate-900">
+          Funding Account
+        </h2>
+
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
+            <span className="text-slate-500">Bank</span>
+            <span className="font-bold">PalmPay</span>
+          </div>
+
+          <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
+            <span className="text-slate-500">
+              Account Number
+            </span>
+            <span className="font-bold">9550627002</span>
+          </div>
+
+          <div className="flex justify-between gap-4 py-2 text-xs">
+            <span className="text-slate-500">Account Name</span>
+            <span className="text-right font-bold">
+              Abdurrahman Yahaya Ibrahim
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -1034,31 +1225,20 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Manage lower-level administrative
-              access.
+              Admin management will be connected in the next
+              isolated fix.
             </p>
           </div>
-
-          <ActionButton
-            onClick={() =>
-              showNotice(
-                'Add admin workflow opened'
-              )
-            }
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Add Admin
-          </ActionButton>
         </div>
 
         <div className="mt-4">
           <EmptyPanel
             icon={ShieldCheck}
-            title="No admin records loaded"
-            text="Admin accounts and permissions will appear when connected to the admin data source."
+            title="Admin management is next"
+            text="This section has intentionally not been changed while manual funding is being verified."
             onClick={() =>
               showNotice(
-                'Admin refresh requested'
+                'Admin management will be connected next.'
               )
             }
           />
@@ -1075,11 +1255,7 @@ export default function SuperAdminDashboard() {
           value="OK"
           subtitle="Protected"
           icon={ShieldCheck}
-          onClick={() =>
-            showNotice(
-              'Security status selected'
-            )
-          }
+          onClick={() => showNotice('Security status selected')}
         />
 
         <SmallCard
@@ -1087,11 +1263,7 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Activity events"
           icon={Activity}
-          onClick={() =>
-            showNotice(
-              'Activity logs selected'
-            )
-          }
+          onClick={() => showNotice('Activity logs selected')}
         />
 
         <SmallCard
@@ -1099,20 +1271,16 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Security alerts"
           icon={Bell}
-          onClick={() =>
-            goTo('notifications')
-          }
+          onClick={() => goTo('notifications')}
         />
       </div>
 
       <EmptyPanel
         icon={Activity}
-        title="Security logs ready"
-        text="Login events, admin actions and security records will appear here."
+        title="Security logs are next"
+        text="Security and audit records will be connected after the core funding workflow is verified."
         onClick={() =>
-          showNotice(
-            'Audit log refresh requested'
-          )
+          showNotice('Security logs will be connected next.')
         }
         buttonText="Refresh Logs"
       />
@@ -1128,31 +1296,19 @@ export default function SuperAdminDashboard() {
           </h2>
 
           <p className="mt-1 text-[10px] text-slate-500">
-            Important system alerts will appear
-            here.
+            Notification management will be connected later.
           </p>
         </div>
-
-        <ActionButton
-          onClick={() =>
-            showNotice(
-              'Notifications marked as reviewed'
-            )
-          }
-          className="bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          Mark Reviewed
-        </ActionButton>
       </div>
 
       <div className="mt-4">
         <EmptyPanel
           icon={Bell}
-          title="No notifications"
-          text="There are currently no loaded system notifications."
+          title="Notifications are next"
+          text="This section has intentionally not been changed while manual funding is being verified."
           onClick={() =>
             showNotice(
-              'Notifications refreshed'
+              'Notifications will be connected next.'
             )
           }
         />
@@ -1181,93 +1337,31 @@ export default function SuperAdminDashboard() {
 
         <div className="mt-4 space-y-2 text-xs">
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">
-              Platform
-            </span>
-
+            <span className="text-slate-500">Platform</span>
             <b>GY Data</b>
           </div>
 
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">
-              Environment
-            </span>
-
+            <span className="text-slate-500">Environment</span>
             <b>Production</b>
           </div>
 
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">
-              Access
-            </span>
-
+            <span className="text-slate-500">Access</span>
             <b>Super Admin</b>
           </div>
         </div>
-
-        <div className="mt-4 flex gap-2">
-          <ActionButton
-            onClick={() =>
-              showNotice(
-                'General settings opened'
-              )
-            }
-            className="bg-slate-100 text-slate-700 hover:bg-slate-200"
-          >
-            General
-          </ActionButton>
-
-          <ActionButton
-            onClick={() => goTo('security')}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Security
-          </ActionButton>
-        </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
         <h2 className="text-sm font-black text-slate-900">
           Executive Controls
         </h2>
 
-        <p className="mt-1 text-[10px] text-slate-500">
-          High-level system actions.
+        <p className="mt-1 text-[10px] leading-5 text-slate-600">
+          System-wide controls will be connected after the
+          funding workflow is verified.
         </p>
-
-        <div className="mt-4 space-y-2">
-          <button
-            type="button"
-            onClick={() =>
-              showNotice(
-                'Maintenance controls opened'
-              )
-            }
-            className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
-          >
-            <span className="text-xs font-bold">
-              Maintenance Controls
-            </span>
-
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              showNotice(
-                'Backup controls opened'
-              )
-            }
-            className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
-          >
-            <span className="text-xs font-bold">
-              Backup Controls
-            </span>
-
-            <ChevronRight className="h-4 w-4 text-slate-400" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1335,9 +1429,7 @@ export default function SuperAdminDashboard() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setMobileMenu(false)
-                }
+                onClick={() => setMobileMenu(false)}
                 className="ml-auto rounded-lg bg-white/10 p-2 lg:hidden"
                 aria-label="Close menu"
               >
@@ -1354,16 +1446,13 @@ export default function SuperAdminDashboard() {
             <div className="space-y-0.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const active =
-                  section === item.id;
+                const active = section === item.id;
 
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() =>
-                      goTo(item.id)
-                    }
+                    onClick={() => goTo(item.id)}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold transition ${
                       active
                         ? 'bg-blue-600 text-white'
@@ -1403,9 +1492,7 @@ export default function SuperAdminDashboard() {
           <div className="flex h-[68px] items-center gap-3 px-4 sm:px-5">
             <button
               type="button"
-              onClick={() =>
-                setMobileMenu(true)
-              }
+              onClick={() => setMobileMenu(true)}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 lg:hidden"
               aria-label="Open menu"
             >
@@ -1424,9 +1511,7 @@ export default function SuperAdminDashboard() {
 
             <button
               type="button"
-              onClick={() =>
-                goTo('notifications')
-              }
+              onClick={() => goTo('notifications')}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600"
               aria-label="Notifications"
             >
@@ -1435,9 +1520,7 @@ export default function SuperAdminDashboard() {
 
             <button
               type="button"
-              onClick={() =>
-                goTo('settings')
-              }
+              onClick={() => goTo('settings')}
               className="hidden h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 sm:flex"
             >
               <Settings className="h-3.5 w-3.5" />
@@ -1464,9 +1547,7 @@ export default function SuperAdminDashboard() {
 
             {section !== 'overview' && (
               <ActionButton
-                onClick={() =>
-                  goTo('overview')
-                }
+                onClick={() => goTo('overview')}
                 className="bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
               >
                 Overview
