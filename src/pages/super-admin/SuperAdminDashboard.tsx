@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -27,6 +28,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 type Section =
   | 'overview'
@@ -46,6 +48,33 @@ type NavItem = {
   icon: typeof Users;
 };
 
+type Profile = {
+  id: string;
+  phone: string;
+  full_name: string;
+  email?: string | null;
+  wallet_balance?: number | string | null;
+  kyc_status?: string | null;
+  is_admin?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type Transaction = {
+  id: string;
+  phone: string;
+  type: string;
+  service: string;
+  product?: string | null;
+  amount: number | string;
+  status: string;
+  recipient?: string | null;
+  network?: string | null;
+  reference?: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+};
+
 type FundingRequest = {
   id: string;
   phone: string;
@@ -60,16 +89,27 @@ type FundingRequest = {
   approved_at?: string | null;
 };
 
-type FundingResponse = {
-  success?: boolean;
-  data?: FundingRequest[];
-  message?: string;
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-  };
+type Notification = {
+  id: string;
+  phone: string;
+  title: string;
+  message: string;
+  type?: string | null;
+  is_read?: boolean | null;
+  created_at?: string | null;
 };
+
+type Product = {
+  id: string;
+  service: string;
+  name: string;
+  price: number | string;
+  network?: string | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
+};
+
+type NoticeType = 'success' | 'error' | 'info';
 
 const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -147,14 +187,44 @@ function formatDate(value?: string | null) {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return '—';
-  }
+  if (Number.isNaN(date.getTime())) return '—';
 
   return date.toLocaleString('en-NG', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+function statusClass(status?: string | null) {
+  const value = String(status || '').toLowerCase();
+
+  if (
+    value === 'success' ||
+    value === 'successful' ||
+    value === 'completed' ||
+    value === 'approved' ||
+    value === 'active'
+  ) {
+    return 'bg-emerald-50 text-emerald-700';
+  }
+
+  if (
+    value === 'pending' ||
+    value === 'processing' ||
+    value === 'unverified'
+  ) {
+    return 'bg-amber-50 text-amber-700';
+  }
+
+  if (
+    value === 'failed' ||
+    value === 'rejected' ||
+    value === 'cancelled'
+  ) {
+    return 'bg-red-50 text-red-700';
+  }
+
+  return 'bg-slate-100 text-slate-600';
 }
 
 function ActionButton({
@@ -301,21 +371,66 @@ export default function SuperAdminDashboard() {
   const [section, setSection] = useState<Section>('overview');
   const [mobileMenu, setMobileMenu] = useState(false);
   const [search, setSearch] = useState('');
-  const [notice, setNotice] = useState('');
 
+  const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<NoticeType>('info');
+
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fundingRequests, setFundingRequests] = useState<
     FundingRequest[]
   >([]);
+  const [notifications, setNotifications] = useState<Notification[]>(
+    []
+  );
+  const [products, setProducts] = useState<Product[]>([]);
 
+  const [loading, setLoading] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [fundingActionId, setFundingActionId] = useState<string | null>(
+    null
+  );
 
-  const [fundingActionId, setFundingActionId] = useState<
-    string | null
-  >(null);
-
+  const [dataError, setDataError] = useState('');
   const [fundingError, setFundingError] = useState('');
 
-  const [fundingLoaded, setFundingLoaded] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(
+    null
+  );
+
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationTarget, setNotificationTarget] = useState('ALL');
+
+  const [notificationSending, setNotificationSending] = useState(false);
+
+  const [adminActionId, setAdminActionId] = useState<string | null>(
+    null
+  );
+
+  const [systemEnabled, setSystemEnabled] = useState(() => {
+    return localStorage.getItem('gydata_system_enabled') !== 'false';
+  });
+
+  const [maintenanceMode, setMaintenanceMode] = useState(() => {
+    return localStorage.getItem('gydata_maintenance_mode') === 'true';
+  });
+
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    return localStorage.getItem('gydata_admin_auto_refresh') !== 'false';
+  });
+
+  const showNotice = useCallback(
+    (text: string, type: NoticeType = 'info') => {
+      setNotice(text);
+      setNoticeType(type);
+
+      window.setTimeout(() => {
+        setNotice('');
+      }, 3500);
+    },
+    []
+  );
 
   const goTo = (next: Section) => {
     setSection(next);
@@ -323,19 +438,92 @@ export default function SuperAdminDashboard() {
     setSearch('');
   };
 
-  const showNotice = (text: string) => {
-    setNotice(text);
-
-    window.setTimeout(() => {
-      setNotice('');
-    }, 3000);
-  };
-
   const logout = () => {
     localStorage.removeItem('gydata_super_admin');
     localStorage.removeItem('gydata_super_admin_session');
     navigate('/super-admin-login', { replace: true });
   };
+
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true);
+    setDataError('');
+
+    try {
+      const [
+        profilesResult,
+        transactionsResult,
+        notificationsResult,
+        productsResult,
+      ] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select(
+            'id,phone,full_name,email,wallet_balance,kyc_status,is_admin,created_at,updated_at'
+          )
+          .order('created_at', { ascending: false })
+          .limit(1000),
+
+        supabase
+          .from('transactions')
+          .select(
+            'id,phone,type,service,product,amount,status,recipient,network,reference,metadata,created_at'
+          )
+          .order('created_at', { ascending: false })
+          .limit(1000),
+
+        supabase
+          .from('notifications')
+          .select(
+            'id,phone,title,message,type,is_read,created_at'
+          )
+          .order('created_at', { ascending: false })
+          .limit(300),
+
+        supabase
+          .from('products')
+          .select(
+            'id,service,name,price,network,is_active,created_at'
+          )
+          .order('created_at', { ascending: false })
+          .limit(1000),
+      ]);
+
+      if (profilesResult.error) {
+        throw new Error(profilesResult.error.message);
+      }
+
+      if (transactionsResult.error) {
+        throw new Error(transactionsResult.error.message);
+      }
+
+      if (notificationsResult.error) {
+        throw new Error(notificationsResult.error.message);
+      }
+
+      if (productsResult.error) {
+        throw new Error(productsResult.error.message);
+      }
+
+      setUsers((profilesResult.data || []) as Profile[]);
+      setTransactions(
+        (transactionsResult.data || []) as Transaction[]
+      );
+      setNotifications(
+        (notificationsResult.data || []) as Notification[]
+      );
+      setProducts((productsResult.data || []) as Product[]);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to load dashboard data.';
+
+      setDataError(message);
+      showNotice(message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showNotice]);
 
   const loadFundingRequests = useCallback(async () => {
     setFundingLoading(true);
@@ -352,7 +540,7 @@ export default function SuperAdminDashboard() {
         }
       );
 
-      const result: FundingResponse = await response.json();
+      const result = await response.json();
 
       if (!response.ok || !result.success) {
         throw new Error(
@@ -363,8 +551,6 @@ export default function SuperAdminDashboard() {
       setFundingRequests(
         Array.isArray(result.data) ? result.data : []
       );
-
-      setFundingLoaded(true);
     } catch (error) {
       const message =
         error instanceof Error
@@ -372,47 +558,236 @@ export default function SuperAdminDashboard() {
           : 'Failed to load funding requests.';
 
       setFundingError(message);
-      setFundingRequests([]);
     } finally {
       setFundingLoading(false);
     }
   }, []);
 
+  const refreshAll = useCallback(async () => {
+    await Promise.all([
+      loadDashboardData(),
+      loadFundingRequests(),
+    ]);
+  }, [loadDashboardData, loadFundingRequests]);
+
   useEffect(() => {
-    if (section === 'funding' || section === 'wallet') {
-      void loadFundingRequests();
-    }
-  }, [section, loadFundingRequests]);
+    void refreshAll();
+  }, [refreshAll]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const timer = window.setInterval(() => {
+      void refreshAll();
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, refreshAll]);
+
+  const pendingAmount = useMemo(
+    () =>
+      fundingRequests.reduce(
+        (total, request) => total + Number(request.amount || 0),
+        0
+      ),
+    [fundingRequests]
+  );
+
+  const totalWallet = useMemo(
+    () =>
+      users.reduce(
+        (total, user) => total + Number(user.wallet_balance || 0),
+        0
+      ),
+    [users]
+  );
+
+  const successfulTransactions = useMemo(
+    () =>
+      transactions.filter((transaction) => {
+        const status = String(transaction.status).toLowerCase();
+
+        return [
+          'success',
+          'successful',
+          'completed',
+          'approved',
+        ].includes(status);
+      }),
+    [transactions]
+  );
+
+  const totalSuccessfulAmount = useMemo(
+    () =>
+      successfulTransactions.reduce(
+        (total, transaction) =>
+          total + Number(transaction.amount || 0),
+        0
+      ),
+    [successfulTransactions]
+  );
+
+  const todayRevenue = useMemo(() => {
+    const now = new Date();
+
+    return successfulTransactions
+      .filter((transaction) => {
+        if (!transaction.created_at) return false;
+
+        const date = new Date(transaction.created_at);
+
+        return (
+          date.getFullYear() === now.getFullYear() &&
+          date.getMonth() === now.getMonth() &&
+          date.getDate() === now.getDate()
+        );
+      })
+      .reduce(
+        (total, transaction) =>
+          total + Number(transaction.amount || 0),
+        0
+      );
+  }, [successfulTransactions]);
+
+  const monthlyRevenue = useMemo(() => {
+    const now = new Date();
+
+    return successfulTransactions
+      .filter((transaction) => {
+        if (!transaction.created_at) return false;
+
+        const date = new Date(transaction.created_at);
+
+        return (
+          date.getFullYear() === now.getFullYear() &&
+          date.getMonth() === now.getMonth()
+        );
+      })
+      .reduce(
+        (total, transaction) =>
+          total + Number(transaction.amount || 0),
+        0
+      );
+  }, [successfulTransactions]);
+
+  const activeUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          String(user.kyc_status || '').toLowerCase() !== 'suspended'
+      ).length,
+    [users]
+  );
+
+  const suspendedUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          String(user.kyc_status || '').toLowerCase() === 'suspended'
+      ).length,
+    [users]
+  );
+
+  const adminUsers = useMemo(
+    () => users.filter((user) => Boolean(user.is_admin)),
+    [users]
+  );
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter((item) => !item.is_read).length,
+    [notifications]
+  );
+
+  const activeProducts = useMemo(
+    () => products.filter((product) => product.is_active !== false).length,
+    [products]
+  );
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return users;
+
+    return users.filter((user) =>
+      [
+        user.full_name,
+        user.phone,
+        user.email,
+        user.kyc_status,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(query)
+        )
+    );
+  }, [users, search]);
+
+  const filteredTransactions = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return transactions;
+
+    return transactions.filter((transaction) =>
+      [
+        transaction.phone,
+        transaction.reference,
+        transaction.service,
+        transaction.product,
+        transaction.status,
+        transaction.network,
+        transaction.recipient,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(query)
+        )
+    );
+  }, [transactions, search]);
+
+  const filteredFundingRequests = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) return fundingRequests;
+
+    return fundingRequests.filter((request) =>
+      [
+        request.phone,
+        request.payment_reference,
+        request.payment_method,
+        request.notes,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(query)
+        )
+    );
+  }, [fundingRequests, search]);
 
   const processFundingRequest = async (
     requestId: string,
     action: 'approve' | 'reject'
   ) => {
-    if (fundingActionId) {
-      return;
-    }
+    if (fundingActionId) return;
 
     const request = fundingRequests.find(
       (item) => item.id === requestId
     );
 
     if (!request) {
-      showNotice('Funding request is no longer available.');
+      showNotice(
+        'Funding request is no longer available.',
+        'error'
+      );
       return;
     }
 
-    const actionLabel =
-      action === 'approve' ? 'approve' : 'reject';
-
     const confirmed = window.confirm(
-      `Are you sure you want to ${actionLabel} this funding request?\n\n` +
+      `Are you sure you want to ${action} this funding request?\n\n` +
         `Phone: ${request.phone}\n` +
         `Amount: ${formatCurrency(request.amount)}`
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setFundingActionId(requestId);
     setFundingError('');
@@ -437,87 +812,242 @@ export default function SuperAdminDashboard() {
       if (!response.ok || !result.success) {
         throw new Error(
           result.message ||
-            `Failed to ${actionLabel} funding request.`
+            `Failed to ${action} funding request.`
         );
       }
 
       showNotice(
         action === 'approve'
           ? 'Funding approved and wallet credited successfully.'
-          : 'Funding request rejected successfully.'
+          : 'Funding request rejected successfully.',
+        'success'
       );
 
-      await loadFundingRequests();
+      await refreshAll();
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : `Failed to ${actionLabel} funding request.`;
+          : `Failed to ${action} funding request.`;
 
       setFundingError(message);
-      showNotice(message);
+      showNotice(message, 'error');
     } finally {
       setFundingActionId(null);
     }
   };
 
-  const pendingAmount = fundingRequests.reduce(
-    (total, request) => total + Number(request.amount || 0),
-    0
-  );
+  const toggleAdmin = async (user: Profile) => {
+    if (adminActionId) return;
 
-  const filteredFundingRequests = fundingRequests.filter(
-    (request) => {
-      const query = search.trim().toLowerCase();
+    const nextValue = !Boolean(user.is_admin);
 
-      if (!query) {
-        return true;
+    if (
+      !window.confirm(
+        nextValue
+          ? `Make ${user.full_name} a Super Admin?`
+          : `Remove admin access from ${user.full_name}?`
+      )
+    ) {
+      return;
+    }
+
+    setAdminActionId(user.id);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_admin: nextValue,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw new Error(error.message);
       }
 
-      return [
-        request.phone,
-        request.payment_reference,
-        request.payment_method,
-        request.notes,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value).toLowerCase().includes(query)
-        );
+      showNotice(
+        nextValue
+          ? 'Admin access granted.'
+          : 'Admin access removed.',
+        'success'
+      );
+
+      await loadDashboardData();
+    } catch (error) {
+      showNotice(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update admin access.',
+        'error'
+      );
+    } finally {
+      setAdminActionId(null);
     }
-  );
+  };
+
+  const sendNotification = async () => {
+    const title = notificationTitle.trim();
+    const message = notificationMessage.trim();
+
+    if (!title || !message) {
+      showNotice(
+        'Enter both notification title and message.',
+        'error'
+      );
+      return;
+    }
+
+    setNotificationSending(true);
+
+    try {
+      const recipients =
+        notificationTarget === 'ALL'
+          ? users.map((user) => user.phone)
+          : [notificationTarget];
+
+      const rows = recipients
+        .filter(Boolean)
+        .map((phone) => ({
+          phone,
+          title,
+          message,
+          type: 'admin',
+          is_read: false,
+        }));
+
+      if (!rows.length) {
+        throw new Error('No customer was selected.');
+      }
+
+      const { error } = await supabase
+        .from('notifications')
+        .insert(rows);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setNotificationTitle('');
+      setNotificationMessage('');
+      setNotificationTarget('ALL');
+
+      showNotice(
+        `Notification sent to ${rows.length} customer${
+          rows.length === 1 ? '' : 's'
+        }.`,
+        'success'
+      );
+
+      await loadDashboardData();
+    } catch (error) {
+      showNotice(
+        error instanceof Error
+          ? error.message
+          : 'Failed to send notification.',
+        'error'
+      );
+    } finally {
+      setNotificationSending(false);
+    }
+  };
+
+  const markNotificationRead = async (
+    notification: Notification
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notification.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? { ...item, is_read: true }
+            : item
+        )
+      );
+    } catch (error) {
+      showNotice(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update notification.',
+        'error'
+      );
+    }
+  };
+
+  const updateSetting = (
+    key:
+      | 'system_enabled'
+      | 'maintenance_mode'
+      | 'admin_auto_refresh',
+    value: boolean
+  ) => {
+    if (key === 'system_enabled') {
+      setSystemEnabled(value);
+      localStorage.setItem(
+        'gydata_system_enabled',
+        String(value)
+      );
+    }
+
+    if (key === 'maintenance_mode') {
+      setMaintenanceMode(value);
+      localStorage.setItem(
+        'gydata_maintenance_mode',
+        String(value)
+      );
+    }
+
+    if (key === 'admin_auto_refresh') {
+      setAutoRefresh(value);
+      localStorage.setItem(
+        'gydata_admin_auto_refresh',
+        String(value)
+      );
+    }
+
+    showNotice('Setting saved on this device.', 'success');
+  };
 
   const renderOverview = () => (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SmallCard
           title="Users"
-          value="0"
-          subtitle="Registered users"
+          value={String(users.length)}
+          subtitle={`${activeUsers} active accounts`}
           icon={Users}
           onClick={() => goTo('users')}
         />
 
         <SmallCard
           title="Wallet"
-          value="₦0"
-          subtitle="Platform balance"
+          value={formatCurrency(totalWallet)}
+          subtitle="Customer wallet balances"
           icon={Wallet}
           onClick={() => goTo('wallet')}
         />
 
         <SmallCard
           title="Transactions"
-          value="0"
-          subtitle="Recorded transactions"
+          value={String(transactions.length)}
+          subtitle={`${successfulTransactions.length} successful`}
           icon={CreditCard}
           onClick={() => goTo('transactions')}
         />
 
         <SmallCard
           title="Revenue"
-          value="₦0"
-          subtitle="Recorded revenue"
+          value={formatCurrency(totalSuccessfulAmount)}
+          subtitle="Successful transaction value"
           icon={BarChart3}
           onClick={() => goTo('revenue')}
         />
@@ -550,28 +1080,28 @@ export default function SuperAdminDashboard() {
             <MiniAction
               icon={Wallet}
               title="Wallet & Funding"
-              description="Manual wallet operations"
+              description="Monitor balances and funding"
               onClick={() => goTo('wallet')}
             />
 
             <MiniAction
               icon={CreditCard}
               title="Transactions"
-              description="Review transactions"
+              description="Review transaction records"
               onClick={() => goTo('transactions')}
             />
 
             <MiniAction
               icon={BarChart3}
               title="Revenue Statistics"
-              description="View performance"
+              description="View real performance"
               onClick={() => goTo('revenue')}
             />
 
             <MiniAction
               icon={Database}
               title="Funding Accounts"
-              description="Manage funding accounts"
+              description="Manage manual funding"
               onClick={() => goTo('funding')}
             />
 
@@ -585,14 +1115,14 @@ export default function SuperAdminDashboard() {
             <MiniAction
               icon={Activity}
               title="Security Logs"
-              description="Review activity"
+              description="Review recent activity"
               onClick={() => goTo('security')}
             />
 
             <MiniAction
               icon={Bell}
               title="Notifications"
-              description="View system alerts"
+              description="Send and review alerts"
               onClick={() => goTo('notifications')}
             />
           </div>
@@ -625,8 +1155,14 @@ export default function SuperAdminDashboard() {
 
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
               <span className="text-slate-500">System</span>
-              <span className="font-bold text-emerald-600">
-                Online
+              <span
+                className={`font-bold ${
+                  systemEnabled
+                    ? 'text-emerald-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {systemEnabled ? 'Online' : 'Disabled'}
               </span>
             </div>
 
@@ -637,23 +1173,46 @@ export default function SuperAdminDashboard() {
               </span>
             </div>
 
-            <div className="flex justify-between py-2 text-xs">
+            <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
               <span className="text-slate-500">
                 Pending Funding
               </span>
+
               <span className="font-bold text-amber-600">
                 {fundingRequests.length}
               </span>
             </div>
+
+            <div className="flex justify-between py-2 text-xs">
+              <span className="text-slate-500">Products</span>
+              <span className="font-bold text-slate-800">
+                {activeProducts} active
+              </span>
+            </div>
           </div>
 
-          <ActionButton
-            onClick={() => goTo('security')}
-            className="mt-4 w-full bg-slate-900 text-white hover:bg-slate-800"
-          >
-            <Activity className="h-3.5 w-3.5" />
-            Security Center
-          </ActionButton>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <ActionButton
+              onClick={() => void refreshAll()}
+              disabled={loading || fundingLoading}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${
+                  loading || fundingLoading ? 'animate-spin' : ''
+                }`}
+              />
+              Refresh
+            </ActionButton>
+
+            <ActionButton
+              onClick={() => goTo('security')}
+              className="bg-slate-900 text-white hover:bg-slate-800"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              Security
+            </ActionButton>
+          </div>
         </div>
       </div>
     </div>
@@ -664,26 +1223,26 @@ export default function SuperAdminDashboard() {
       <div className="grid grid-cols-3 gap-3">
         <SmallCard
           title="All Users"
-          value="0"
-          subtitle="Registered"
+          value={String(users.length)}
+          subtitle="Registered profiles"
           icon={Users}
-          onClick={() => showNotice('User management is next.')}
+          onClick={() => setSearch('')}
         />
 
         <SmallCard
           title="Active"
-          value="0"
-          subtitle="Active accounts"
+          value={String(activeUsers)}
+          subtitle="Not suspended"
           icon={UserCheck}
-          onClick={() => showNotice('User management is next.')}
+          onClick={() => setSearch('')}
         />
 
         <SmallCard
           title="Suspended"
-          value="0"
-          subtitle="Suspended accounts"
+          value={String(suspendedUsers)}
+          subtitle="Suspended profiles"
           icon={UserX}
-          onClick={() => showNotice('User management is next.')}
+          onClick={() => setSearch('suspended')}
         />
       </div>
 
@@ -695,8 +1254,7 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              User management will be connected in the next
-              isolated fix.
+              Real profiles from Supabase.
             </p>
           </div>
 
@@ -706,866 +1264,84 @@ export default function SuperAdminDashboard() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search user..."
+              placeholder="Search name, phone, email..."
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
             />
           </div>
         </div>
 
-        <div className="mt-4">
-          <EmptyPanel
-            icon={Users}
-            title="User management is next"
-            text="This section has intentionally not been changed while we connect manual funding safely."
-            onClick={() =>
-              showNotice(
-                'User management will be connected next.'
-              )
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderWallet = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <SmallCard
-          title="Balance"
-          value="₦0"
-          subtitle="Platform wallet"
-          icon={Wallet}
-          onClick={() =>
-            showNotice(
-              'Customer wallet data will be connected next.'
-            )
-          }
-        />
-
-        <SmallCard
-          title="Pending"
-          value={String(fundingRequests.length)}
-          subtitle="Funding reviews"
-          icon={ArrowDownToLine}
-          onClick={() => goTo('funding')}
-        />
-
-        <SmallCard
-          title="Pending Value"
-          value={formatCurrency(pendingAmount)}
-          subtitle="Awaiting approval"
-          icon={Database}
-          onClick={() => goTo('funding')}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-black text-slate-900">
-            Manual Funding Account
-          </h2>
-
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Bank</span>
-              <span className="font-bold">PalmPay</span>
-            </div>
-
-            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">
-                Account Number
-              </span>
-              <span className="font-bold">9550627002</span>
-            </div>
-
-            <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Account Name</span>
-              <span className="text-right font-bold">
-                Abdurrahman Yahaya Ibrahim
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ActionButton
-              onClick={() => goTo('funding')}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Funding Requests
-            </ActionButton>
-
-            <ActionButton
-              onClick={() => void loadFundingRequests()}
-              disabled={fundingLoading}
-              className="bg-slate-100 text-slate-700 hover:bg-slate-200"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${
-                  fundingLoading ? 'animate-spin' : ''
-                }`}
-              />
-              Refresh
-            </ActionButton>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-black text-slate-900">
-            Pending Manual Funding
-          </h2>
-
-          <p className="mt-1 text-[10px] text-slate-500">
-            Requests waiting for Super Admin review.
-          </p>
-
-          <div className="mt-4 flex items-center justify-between rounded-lg bg-blue-50 p-4">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">
-                Requests
-              </p>
-
-              <p className="mt-1 text-2xl font-black text-slate-900">
-                {fundingRequests.length}
-              </p>
-            </div>
-
-            <ArrowDownToLine className="h-6 w-6 text-blue-600" />
-          </div>
-
-          <ActionButton
-            onClick={() => goTo('funding')}
-            className="mt-4 w-full bg-[#061337] text-white hover:bg-[#0b1d4d]"
-          >
-            Review Funding Requests
-            <ChevronRight className="h-3.5 w-3.5" />
-          </ActionButton>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderTransactions = () => (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-black text-slate-900">
-              Transaction Control
-            </h2>
-
-            <p className="mt-1 text-[10px] text-slate-500">
-              Transaction management will be connected next.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <EmptyPanel
-            icon={CreditCard}
-            title="Transaction management is next"
-            text="This section has intentionally not been changed while manual funding is being connected."
-            onClick={() =>
-              showNotice(
-                'Transaction management will be connected next.'
-              )
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderRevenue = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SmallCard
-          title="Revenue"
-          value="₦0"
-          subtitle="Total recorded"
-          icon={ArrowUpRight}
-          onClick={() =>
-            showNotice('Revenue analytics will be connected next.')
-          }
-        />
-
-        <SmallCard
-          title="Today"
-          value="₦0"
-          subtitle="Today revenue"
-          icon={BarChart3}
-          onClick={() =>
-            showNotice('Revenue analytics will be connected next.')
-          }
-        />
-
-        <SmallCard
-          title="Monthly"
-          value="₦0"
-          subtitle="Monthly revenue"
-          icon={BarChart3}
-          onClick={() =>
-            showNotice('Revenue analytics will be connected next.')
-          }
-        />
-
-        <SmallCard
-          title="Transactions"
-          value="0"
-          subtitle="Revenue records"
-          icon={CreditCard}
-          onClick={() => goTo('transactions')}
-        />
-      </div>
-
-      <EmptyPanel
-        icon={BarChart3}
-        title="Revenue analytics is next"
-        text="Revenue statistics will be connected after the funding workflow is verified."
-        onClick={() =>
-          showNotice('Revenue analytics will be connected next.')
-        }
-      />
-    </div>
-  );
-
-  const renderFunding = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SmallCard
-          title="Pending Requests"
-          value={String(fundingRequests.length)}
-          subtitle="Awaiting review"
-          icon={ArrowDownToLine}
-          onClick={() => void loadFundingRequests()}
-        />
-
-        <SmallCard
-          title="Pending Amount"
-          value={formatCurrency(pendingAmount)}
-          subtitle="Total awaiting approval"
-          icon={Wallet}
-          onClick={() => void loadFundingRequests()}
-        />
-
-        <SmallCard
-          title="Status"
-          value={fundingLoading ? 'Loading' : 'Live'}
-          subtitle="Funding API"
-          icon={Activity}
-          onClick={() => void loadFundingRequests()}
-        />
-
-        <SmallCard
-          title="Manual"
-          value="ON"
-          subtitle="Manual funding"
-          icon={Database}
-          onClick={() =>
-            showNotice('Manual funding is enabled.')
-          }
-        />
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-sm font-black text-slate-900">
-              Pending Funding Requests
-            </h2>
-
-            <p className="mt-1 text-[10px] text-slate-500">
-              Review customer payment references before approving
-              wallet credit.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search phone/reference..."
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400 sm:w-[230px]"
-              />
-            </div>
-
-            <ActionButton
-              onClick={() => void loadFundingRequests()}
-              disabled={fundingLoading}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${
-                  fundingLoading ? 'animate-spin' : ''
-                }`}
-              />
-              Refresh
-            </ActionButton>
-          </div>
-        </div>
-
-        {fundingError && (
+        {dataError && (
           <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
-            {fundingError}
+            {dataError}
           </div>
         )}
 
-        {!fundingLoading &&
-          fundingLoaded &&
-          filteredFundingRequests.length === 0 && (
-            <div className="mt-4">
-              <EmptyPanel
-                icon={Check}
-                title={
-                  search
-                    ? 'No matching funding requests'
-                    : 'No pending funding requests'
-                }
-                text={
-                  search
-                    ? `Nothing matches "${search}".`
-                    : 'There are currently no pending manual funding requests.'
-                }
-                onClick={() => void loadFundingRequests()}
-                buttonText="Refresh"
-              />
-            </div>
-          )}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[850px] text-left">
+            <thead>
+              <tr className="border-b border-slate-100 text-[9px] uppercase tracking-wide text-slate-400">
+                <th className="px-3 py-3">User</th>
+                <th className="px-3 py-3">Phone</th>
+                <th className="px-3 py-3">Wallet</th>
+                <th className="px-3 py-3">KYC</th>
+                <th className="px-3 py-3">Admin</th>
+                <th className="px-3 py-3">Joined</th>
+                <th className="px-3 py-3">Action</th>
+              </tr>
+            </thead>
 
-        {fundingLoading && (
-          <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-8 text-center">
-            <RefreshCw className="mx-auto h-5 w-5 animate-spin text-blue-600" />
-
-            <p className="mt-3 text-xs font-semibold text-slate-500">
-              Loading pending funding requests...
-            </p>
-          </div>
-        )}
-
-        {!fundingLoading &&
-          filteredFundingRequests.length > 0 && (
-            <div className="mt-4 space-y-3">
-              {filteredFundingRequests.map((request) => {
-                const busy =
-                  fundingActionId === request.id;
-
-                return (
-                  <div
-                    key={request.id}
-                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">
-                            PENDING
-                          </span>
-
-                          <span className="text-[10px] text-slate-400">
-                            {formatDate(request.created_at)}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                          <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Customer
-                            </p>
-
-                            <p className="mt-1 text-xs font-black text-slate-900">
-                              {request.phone}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Amount
-                            </p>
-
-                            <p className="mt-1 text-sm font-black text-blue-700">
-                              {formatCurrency(request.amount)}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Payment Method
-                            </p>
-
-                            <p className="mt-1 text-xs font-bold text-slate-800">
-                              {request.payment_method ||
-                                'Manual'}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Payment Reference
-                            </p>
-
-                            <p className="mt-1 break-all text-xs font-bold text-slate-800">
-                              {request.payment_reference ||
-                                '—'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {request.notes && (
-                          <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Customer Note
-                            </p>
-
-                            <p className="mt-1 text-xs leading-5 text-slate-600">
-                              {request.notes}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex shrink-0 flex-col gap-2 sm:flex-row xl:flex-col">
-                        <ActionButton
-                          onClick={() =>
-                            void processFundingRequest(
-                              request.id,
-                              'approve'
-                            )
-                          }
-                          disabled={busy}
-                          className="bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          {busy ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Check className="h-3.5 w-3.5" />
-                          )}
-                          Approve
-                        </ActionButton>
-
-                        <ActionButton
-                          onClick={() =>
-                            void processFundingRequest(
-                              request.id,
-                              'reject'
-                            )
-                          }
-                          disabled={busy}
-                          className="bg-red-50 text-red-700 hover:bg-red-100"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Reject
-                        </ActionButton>
-                      </div>
+            <tbody>
+              {filteredUsers.slice(0, 100).map((user) => (
+                <tr
+                  key={user.id}
+                  className="border-b border-slate-50 text-xs hover:bg-slate-50"
+                >
+                  <td className="px-3 py-3">
+                    <div>
+                      <p className="font-bold text-slate-900">
+                        {user.full_name}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">
+                        {user.email || 'No email'}
+                      </p>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-      </div>
+                  </td>
 
-      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+                  <td className="px-3 py-3 font-semibold">
+                    {user.phone}
+                  </td>
 
-          <div>
-            <h3 className="text-xs font-black text-slate-900">
-              Funding safety
-            </h3>
+                  <td className="px-3 py-3 font-black text-blue-700">
+                    {formatCurrency(user.wallet_balance)}
+                  </td>
 
-            <p className="mt-1 text-[10px] leading-5 text-slate-600">
-              Approval is processed by the backend RPC. The
-              database checks that the request is still pending
-              before crediting the wallet, creating the
-              transaction and marking the request approved.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-black text-slate-900">
-          Funding Account
-        </h2>
-
-        <div className="mt-4 space-y-2">
-          <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-            <span className="text-slate-500">Bank</span>
-            <span className="font-bold">PalmPay</span>
-          </div>
-
-          <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-            <span className="text-slate-500">
-              Account Number
-            </span>
-            <span className="font-bold">9550627002</span>
-          </div>
-
-          <div className="flex justify-between gap-4 py-2 text-xs">
-            <span className="text-slate-500">Account Name</span>
-            <span className="text-right font-bold">
-              Abdurrahman Yahaya Ibrahim
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderAdmins = () => (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-black text-slate-900">
-              Admin Management
-            </h2>
-
-            <p className="mt-1 text-[10px] text-slate-500">
-              Admin management will be connected in the next
-              isolated fix.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <EmptyPanel
-            icon={ShieldCheck}
-            title="Admin management is next"
-            text="This section has intentionally not been changed while manual funding is being verified."
-            onClick={() =>
-              showNotice(
-                'Admin management will be connected next.'
-              )
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderSecurity = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <SmallCard
-          title="Security"
-          value="OK"
-          subtitle="Protected"
-          icon={ShieldCheck}
-          onClick={() => showNotice('Security status selected')}
-        />
-
-        <SmallCard
-          title="Logs"
-          value="0"
-          subtitle="Activity events"
-          icon={Activity}
-          onClick={() => showNotice('Activity logs selected')}
-        />
-
-        <SmallCard
-          title="Alerts"
-          value="0"
-          subtitle="Security alerts"
-          icon={Bell}
-          onClick={() => goTo('notifications')}
-        />
-      </div>
-
-      <EmptyPanel
-        icon={Activity}
-        title="Security logs are next"
-        text="Security and audit records will be connected after the core funding workflow is verified."
-        onClick={() =>
-          showNotice('Security logs will be connected next.')
-        }
-        buttonText="Refresh Logs"
-      />
-    </div>
-  );
-
-  const renderNotifications = () => (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-slate-900">
-            Notifications & Alerts
-          </h2>
-
-          <p className="mt-1 text-[10px] text-slate-500">
-            Notification management will be connected later.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <EmptyPanel
-          icon={Bell}
-          title="Notifications are next"
-          text="This section has intentionally not been changed while manual funding is being verified."
-          onClick={() =>
-            showNotice(
-              'Notifications will be connected next.'
-            )
-          }
-        />
-      </div>
-    </div>
-  );
-
-  const renderSettings = () => (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-            <Settings className="h-4 w-4" />
-          </div>
-
-          <div>
-            <h2 className="text-sm font-black text-slate-900">
-              System Settings
-            </h2>
-
-            <p className="text-[10px] text-slate-500">
-              High-level configuration.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-2 text-xs">
-          <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Platform</span>
-            <b>GY Data</b>
-          </div>
-
-          <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Environment</span>
-            <b>Production</b>
-          </div>
-
-          <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Access</span>
-            <b>Super Admin</b>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-        <h2 className="text-sm font-black text-slate-900">
-          Executive Controls
-        </h2>
-
-        <p className="mt-1 text-[10px] leading-5 text-slate-600">
-          System-wide controls will be connected after the
-          funding workflow is verified.
-        </p>
-      </div>
-    </div>
-  );
-
-  const renderContent = () => {
-    switch (section) {
-      case 'users':
-        return renderUsers();
-
-      case 'wallet':
-        return renderWallet();
-
-      case 'transactions':
-        return renderTransactions();
-
-      case 'revenue':
-        return renderRevenue();
-
-      case 'funding':
-        return renderFunding();
-
-      case 'admins':
-        return renderAdmins();
-
-      case 'security':
-        return renderSecurity();
-
-      case 'notifications':
-        return renderNotifications();
-
-      case 'settings':
-        return renderSettings();
-
-      case 'overview':
-      default:
-        return renderOverview();
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f5f7fb] text-slate-800">
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[250px] bg-[#061337] text-white shadow-2xl transition-transform ${
-          mobileMenu
-            ? 'translate-x-0'
-            : '-translate-x-full'
-        } lg:translate-x-0`}
-      >
-        <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-300">
-                  GY DATA
-                </p>
-
-                <h1 className="text-sm font-black">
-                  Executive Office
-                </h1>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setMobileMenu(false)}
-                className="ml-auto rounded-lg bg-white/10 p-2 lg:hidden"
-                aria-label="Close menu"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2.5">
-            <p className="px-2.5 pb-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/30">
-              Control Center
-            </p>
-
-            <div className="space-y-0.5">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = section === item.id;
-
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => goTo(item.id)}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold transition ${
-                      active
-                        ? 'bg-blue-600 text-white'
-                        : 'text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.label}
+                  <td className="px-3 py-3">
+                    <span
+                      className={`rounded-full px-2 py-1 text-[9px] font-bold ${statusClass(
+                        user.kyc_status
+                      )}`}
+                    >
+                      {user.kyc_status || 'unverified'}
                     </span>
+                  </td>
 
-                    {active && (
-                      <ChevronRight className="h-3.5 w-3.5" />
+                  <td className="px-3 py-3">
+                    {user.is_admin ? (
+                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">
+                        ADMIN
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">
+                        User
+                      </span>
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                  </td>
 
-          <div className="border-t border-white/10 p-2.5">
-            <button
-              type="button"
-              onClick={logout}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-xs font-bold text-red-300 hover:bg-red-500/10"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </aside>
+                  <td className="px-3 py-3 text-[10px] text-slate-500">
+                    {formatDate(user.created_at)}
+                  </td>
 
-      <div className="lg:pl-[250px]">
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-          <div className="flex h-[68px] items-center gap-3 px-4 sm:px-5">
-            <button
-              type="button"
-              onClick={() => setMobileMenu(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 lg:hidden"
-              aria-label="Open menu"
-            >
-              <Menu className="h-4 w-4" />
-            </button>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-blue-600">
-                Super Admin
-              </p>
-
-              <h2 className="truncate text-base font-black text-slate-900">
-                {sectionInfo[section].title}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => goTo('notifications')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goTo('settings')}
-              className="hidden h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 sm:flex"
-            >
-              <Settings className="h-3.5 w-3.5" />
-              Settings
-            </button>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-[1450px] p-4 sm:p-5">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold text-slate-400">
-                GY Data Executive Control Center
-              </p>
-
-              <h1 className="mt-1 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
-                {sectionInfo[section].title}
-              </h1>
-
-              <p className="mt-1 text-[10px] text-slate-400">
-                {sectionInfo[section].description}
-              </p>
-            </div>
-
-            {section !== 'overview' && (
-              <ActionButton
-                onClick={() => goTo('overview')}
-                className="bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-              >
-                Overview
-              </ActionButton>
-            )}
-          </div>
-
-          {renderContent()}
-        </main>
-      </div>
-
-      {notice && (
-        <div className="fixed bottom-5 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2">
-          <div className="rounded-xl bg-[#061337] px-4 py-3 text-xs font-semibold text-white shadow-2xl">
-            {notice}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                  <td className="px-3 py-3">
+                    <ActionButton
+                      onClick={() => setSelectedUser(user)}
+                      className="bg-slate-100 text-slate-700 hover:bg-blue
