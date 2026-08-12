@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import {
   Activity,
   ArrowDownToLine,
@@ -241,11 +242,8 @@ export default function SuperAdminDashboard() {
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
 
-  const goTo = (next: Section) => {
-    setSection(next);
-    setMobileMenu(false);
-    setSearch('');
-  };
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
 
   const showNotice = (text: string) => {
     setNotice(text);
@@ -255,10 +253,50 @@ export default function SuperAdminDashboard() {
     }, 2500);
   };
 
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', {
+        ascending: false,
+      });
+
+    if (error) {
+      console.error(
+        'Super Admin users error:',
+        error.message
+      );
+
+      showNotice('Unable to load users');
+      setUsers([]);
+    } else {
+      setUsers(data || []);
+    }
+
+    setUsersLoading(false);
+  };
+
+  const goTo = (next: Section) => {
+    setSection(next);
+    setMobileMenu(false);
+    setSearch('');
+
+    if (next === 'users') {
+      void fetchUsers();
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('gydata_super_admin');
-    localStorage.removeItem('gydata_super_admin_session');
-    navigate('/super-admin-login', { replace: true });
+    localStorage.removeItem(
+      'gydata_super_admin_session'
+    );
+
+    navigate('/super-admin-login', {
+      replace: true,
+    });
   };
 
   const renderOverview = () => (
@@ -266,7 +304,7 @@ export default function SuperAdminDashboard() {
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <SmallCard
           title="Users"
-          value="0"
+          value={String(users.length)}
           subtitle="Registered users"
           icon={Users}
           onClick={() => goTo('users')}
@@ -391,21 +429,30 @@ export default function SuperAdminDashboard() {
 
           <div className="mt-4 space-y-2">
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Access</span>
+              <span className="text-slate-500">
+                Access
+              </span>
+
               <span className="font-bold text-slate-800">
                 Super Admin
               </span>
             </div>
 
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">System</span>
+              <span className="text-slate-500">
+                System
+              </span>
+
               <span className="font-bold text-emerald-600">
                 Online
               </span>
             </div>
 
             <div className="flex justify-between border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Security</span>
+              <span className="text-slate-500">
+                Security
+              </span>
+
               <span className="font-bold text-blue-600">
                 Protected
               </span>
@@ -450,73 +497,247 @@ export default function SuperAdminDashboard() {
     </div>
   );
 
-  const renderUsers = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-3">
-        <SmallCard
-          title="All Users"
-          value="0"
-          subtitle="Registered"
-          icon={Users}
-          onClick={() => showNotice('All users selected')}
-        />
+  const renderUsers = () => {
+    const query = search.trim().toLowerCase();
 
-        <SmallCard
-          title="Active"
-          value="0"
-          subtitle="Active accounts"
-          icon={UserCheck}
-          onClick={() => showNotice('Active users selected')}
-        />
+    const filteredUsers = users.filter((item) => {
+      const name = String(
+        item.full_name ||
+          item.name ||
+          item.username ||
+          ''
+      ).toLowerCase();
 
-        <SmallCard
-          title="Suspended"
-          value="0"
-          subtitle="Suspended accounts"
-          icon={UserX}
-          onClick={() => showNotice('Suspended users selected')}
-        />
-      </div>
+      const phone = String(
+        item.phone || ''
+      ).toLowerCase();
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-sm font-black text-slate-900">
-              User Directory
-            </h2>
+      const email = String(
+        item.email || ''
+      ).toLowerCase();
 
-            <p className="mt-1 text-[10px] text-slate-500">
-              Search, suspend or activate customer accounts.
-            </p>
-          </div>
+      return (
+        !query ||
+        name.includes(query) ||
+        phone.includes(query) ||
+        email.includes(query)
+      );
+    });
 
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+    const activeUsers = users.filter((item) => {
+      const status = String(
+        item.status || ''
+      ).toLowerCase();
 
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search user..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
-            />
-          </div>
-        </div>
+      return (
+        item.is_active !== false &&
+        status !== 'suspended' &&
+        status !== 'inactive'
+      );
+    });
 
-        <div className="mt-4">
-          <EmptyPanel
+    const suspendedUsers = users.filter((item) => {
+      const status = String(
+        item.status || ''
+      ).toLowerCase();
+
+      return (
+        item.is_active === false ||
+        status === 'suspended' ||
+        status === 'inactive'
+      );
+    });
+
+    const money = (value: unknown) =>
+      `₦${Number(value || 0).toLocaleString(
+        'en-NG',
+        {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }
+      )}`;
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-3 gap-3">
+          <SmallCard
+            title="All Users"
+            value={String(users.length)}
+            subtitle="Registered"
             icon={Users}
-            title="No user records loaded"
-            text={
-              search
-                ? `No connected records match "${search}".`
-                : 'Connect the user data source to display customer accounts here.'
-            }
-            onClick={() => showNotice('User data refresh requested')}
+            onClick={() => setSearch('')}
+          />
+
+          <SmallCard
+            title="Active"
+            value={String(
+              activeUsers.length
+            )}
+            subtitle="Active accounts"
+            icon={UserCheck}
+            onClick={() => setSearch('')}
+          />
+
+          <SmallCard
+            title="Suspended"
+            value={String(
+              suspendedUsers.length
+            )}
+            subtitle="Suspended accounts"
+            icon={UserX}
+            onClick={() => setSearch('')}
           />
         </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-black text-slate-900">
+                User Directory
+              </h2>
+
+              <p className="mt-1 text-[10px] text-slate-500">
+                Search real customer accounts
+                from Supabase.
+              </p>
+            </div>
+
+            <div className="flex w-full gap-2 sm:w-auto">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+
+                <input
+                  value={search}
+                  onChange={(e) =>
+                    setSearch(e.target.value)
+                  }
+                  placeholder="Search name, phone or email..."
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-xs outline-none focus:border-blue-400"
+                />
+              </div>
+
+              <ActionButton
+                onClick={() =>
+                  void fetchUsers()
+                }
+                className="shrink-0 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Refresh
+              </ActionButton>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            {usersLoading ? (
+              <div className="rounded-lg bg-slate-50 p-8 text-center text-xs text-slate-500">
+                Loading users...
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <EmptyPanel
+                icon={Users}
+                title="No user records found"
+                text={
+                  query
+                    ? `No users match "${search}".`
+                    : 'No customer accounts are currently available.'
+                }
+                onClick={() =>
+                  void fetchUsers()
+                }
+              />
+            ) : (
+              <div className="min-w-[760px] overflow-hidden rounded-lg border border-slate-200">
+                <div className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 bg-slate-50 px-4 py-3 text-[10px] font-black uppercase tracking-wide text-slate-400">
+                  <span>User</span>
+                  <span>Phone</span>
+                  <span>Wallet</span>
+                  <span>Cashback</span>
+                  <span>Status</span>
+                </div>
+
+                {filteredUsers.map((item) => {
+                  const name =
+                    item.full_name ||
+                    item.name ||
+                    item.username ||
+                    'Customer';
+
+                  const status = String(
+                    item.status || ''
+                  ).toLowerCase();
+
+                  const suspended =
+                    item.is_active === false ||
+                    status === 'suspended' ||
+                    status === 'inactive';
+
+                  return (
+                    <div
+                      key={
+                        item.id ||
+                        item.phone
+                      }
+                      className="grid grid-cols-[1.4fr_1fr_0.8fr_0.8fr_0.8fr] gap-3 border-t border-slate-100 px-4 py-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-800">
+                          {name}
+                        </p>
+
+                        <p className="truncate text-[10px] text-slate-400">
+                          {item.email ||
+                            'No email'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center text-slate-600">
+                        {item.phone || '—'}
+                      </div>
+
+                      <div className="flex items-center font-bold text-slate-800">
+                        {money(
+                          item.wallet_balance
+                        )}
+                      </div>
+
+                      <div className="flex items-center font-bold text-emerald-600">
+                        {money(
+                          item.cashback_balance
+                        )}
+                      </div>
+
+                      <div className="flex items-center">
+                        <span
+                          className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                            suspended
+                              ? 'bg-red-50 text-red-600'
+                              : 'bg-emerald-50 text-emerald-600'
+                          }`}
+                        >
+                          {suspended
+                            ? 'Suspended'
+                            : 'Active'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {!usersLoading &&
+            filteredUsers.length > 0 && (
+              <p className="mt-3 text-[10px] text-slate-400">
+                Showing{' '}
+                {filteredUsers.length} of{' '}
+                {users.length} users.
+              </p>
+            )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderWallet = () => (
     <div className="space-y-4">
@@ -526,7 +747,11 @@ export default function SuperAdminDashboard() {
           value="₦0"
           subtitle="Platform wallet"
           icon={Wallet}
-          onClick={() => showNotice('Wallet balance selected')}
+          onClick={() =>
+            showNotice(
+              'Wallet balance selected'
+            )
+          }
         />
 
         <SmallCard
@@ -554,17 +779,30 @@ export default function SuperAdminDashboard() {
 
           <div className="mt-4 space-y-2">
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Bank</span>
-              <span className="font-bold">PalmPay</span>
+              <span className="text-slate-500">
+                Bank
+              </span>
+
+              <span className="font-bold">
+                PalmPay
+              </span>
             </div>
 
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Account Number</span>
-              <span className="font-bold">9550627002</span>
+              <span className="text-slate-500">
+                Account Number
+              </span>
+
+              <span className="font-bold">
+                9550627002
+              </span>
             </div>
 
             <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-xs">
-              <span className="text-slate-500">Account Name</span>
+              <span className="text-slate-500">
+                Account Name
+              </span>
+
               <span className="text-right font-bold">
                 Abdurrahman Yahaya Ibrahim
               </span>
@@ -580,7 +818,9 @@ export default function SuperAdminDashboard() {
             </ActionButton>
 
             <ActionButton
-              onClick={() => goTo('transactions')}
+              onClick={() =>
+                goTo('transactions')
+              }
               className="bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
               Transactions
@@ -592,7 +832,11 @@ export default function SuperAdminDashboard() {
           icon={Wallet}
           title="Wallet records not connected"
           text="Wallet operations are ready for connection to live wallet data."
-          onClick={() => showNotice('Wallet refresh requested')}
+          onClick={() =>
+            showNotice(
+              'Wallet refresh requested'
+            )
+          }
         />
       </div>
     </div>
@@ -608,20 +852,29 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Search and filter platform transactions.
+              Search and filter platform
+              transactions.
             </p>
           </div>
 
           <div className="flex gap-2">
             <ActionButton
-              onClick={() => showNotice('Transaction filters opened')}
+              onClick={() =>
+                showNotice(
+                  'Transaction filters opened'
+                )
+              }
               className="bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
               Filters
             </ActionButton>
 
             <ActionButton
-              onClick={() => showNotice('Transaction export requested')}
+              onClick={() =>
+                showNotice(
+                  'Transaction export requested'
+                )
+              }
               className="bg-blue-600 text-white hover:bg-blue-700"
             >
               Export
@@ -634,7 +887,11 @@ export default function SuperAdminDashboard() {
             icon={CreditCard}
             title="No transactions loaded"
             text="Transaction records will appear here when connected to the transaction source."
-            onClick={() => showNotice('Transaction refresh requested')}
+            onClick={() =>
+              showNotice(
+                'Transaction refresh requested'
+              )
+            }
           />
         </div>
       </div>
@@ -649,7 +906,9 @@ export default function SuperAdminDashboard() {
           value="₦0"
           subtitle="Total recorded"
           icon={ArrowUpRight}
-          onClick={() => showNotice('Revenue selected')}
+          onClick={() =>
+            showNotice('Revenue selected')
+          }
         />
 
         <SmallCard
@@ -657,7 +916,9 @@ export default function SuperAdminDashboard() {
           value="₦0"
           subtitle="Today revenue"
           icon={BarChart3}
-          onClick={() => showNotice('Today selected')}
+          onClick={() =>
+            showNotice('Today selected')
+          }
         />
 
         <SmallCard
@@ -665,7 +926,9 @@ export default function SuperAdminDashboard() {
           value="₦0"
           subtitle="Monthly revenue"
           icon={BarChart3}
-          onClick={() => showNotice('Monthly selected')}
+          onClick={() =>
+            showNotice('Monthly selected')
+          }
         />
 
         <SmallCard
@@ -673,7 +936,9 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Revenue records"
           icon={CreditCard}
-          onClick={() => goTo('transactions')}
+          onClick={() =>
+            goTo('transactions')
+          }
         />
       </div>
 
@@ -681,7 +946,11 @@ export default function SuperAdminDashboard() {
         icon={BarChart3}
         title="Statistics ready"
         text="Revenue analytics will populate when connected to transaction data."
-        onClick={() => showNotice('Statistics refresh requested')}
+        onClick={() =>
+          showNotice(
+            'Statistics refresh requested'
+          )
+        }
       />
     </div>
   );
@@ -696,12 +965,17 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Accounts used for manual wallet funding.
+              Accounts used for manual wallet
+              funding.
             </p>
           </div>
 
           <ActionButton
-            onClick={() => showNotice('Add funding account opened')}
+            onClick={() =>
+              showNotice(
+                'Add funding account opened'
+              )
+            }
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
             Add Account
@@ -710,7 +984,11 @@ export default function SuperAdminDashboard() {
 
         <button
           type="button"
-          onClick={() => showNotice('PalmPay account details opened')}
+          onClick={() =>
+            showNotice(
+              'PalmPay account details opened'
+            )
+          }
           className="mt-4 flex w-full items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-left transition hover:bg-blue-100"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
@@ -727,7 +1005,8 @@ export default function SuperAdminDashboard() {
             </p>
 
             <p className="mt-1 text-[10px] text-slate-600">
-              9550627002 · Abdurrahman Yahaya Ibrahim
+              9550627002 · Abdurrahman Yahaya
+              Ibrahim
             </p>
           </div>
 
@@ -755,12 +1034,17 @@ export default function SuperAdminDashboard() {
             </h2>
 
             <p className="mt-1 text-[10px] text-slate-500">
-              Manage lower-level administrative access.
+              Manage lower-level administrative
+              access.
             </p>
           </div>
 
           <ActionButton
-            onClick={() => showNotice('Add admin workflow opened')}
+            onClick={() =>
+              showNotice(
+                'Add admin workflow opened'
+              )
+            }
             className="bg-blue-600 text-white hover:bg-blue-700"
           >
             Add Admin
@@ -772,7 +1056,11 @@ export default function SuperAdminDashboard() {
             icon={ShieldCheck}
             title="No admin records loaded"
             text="Admin accounts and permissions will appear when connected to the admin data source."
-            onClick={() => showNotice('Admin refresh requested')}
+            onClick={() =>
+              showNotice(
+                'Admin refresh requested'
+              )
+            }
           />
         </div>
       </div>
@@ -787,7 +1075,11 @@ export default function SuperAdminDashboard() {
           value="OK"
           subtitle="Protected"
           icon={ShieldCheck}
-          onClick={() => showNotice('Security status selected')}
+          onClick={() =>
+            showNotice(
+              'Security status selected'
+            )
+          }
         />
 
         <SmallCard
@@ -795,7 +1087,11 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Activity events"
           icon={Activity}
-          onClick={() => showNotice('Activity logs selected')}
+          onClick={() =>
+            showNotice(
+              'Activity logs selected'
+            )
+          }
         />
 
         <SmallCard
@@ -803,7 +1099,9 @@ export default function SuperAdminDashboard() {
           value="0"
           subtitle="Security alerts"
           icon={Bell}
-          onClick={() => goTo('notifications')}
+          onClick={() =>
+            goTo('notifications')
+          }
         />
       </div>
 
@@ -811,7 +1109,11 @@ export default function SuperAdminDashboard() {
         icon={Activity}
         title="Security logs ready"
         text="Login events, admin actions and security records will appear here."
-        onClick={() => showNotice('Audit log refresh requested')}
+        onClick={() =>
+          showNotice(
+            'Audit log refresh requested'
+          )
+        }
         buttonText="Refresh Logs"
       />
     </div>
@@ -826,12 +1128,17 @@ export default function SuperAdminDashboard() {
           </h2>
 
           <p className="mt-1 text-[10px] text-slate-500">
-            Important system alerts will appear here.
+            Important system alerts will appear
+            here.
           </p>
         </div>
 
         <ActionButton
-          onClick={() => showNotice('Notifications marked as reviewed')}
+          onClick={() =>
+            showNotice(
+              'Notifications marked as reviewed'
+            )
+          }
           className="bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
           Mark Reviewed
@@ -843,7 +1150,11 @@ export default function SuperAdminDashboard() {
           icon={Bell}
           title="No notifications"
           text="There are currently no loaded system notifications."
-          onClick={() => showNotice('Notifications refreshed')}
+          onClick={() =>
+            showNotice(
+              'Notifications refreshed'
+            )
+          }
         />
       </div>
     </div>
@@ -870,24 +1181,37 @@ export default function SuperAdminDashboard() {
 
         <div className="mt-4 space-y-2 text-xs">
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Platform</span>
+            <span className="text-slate-500">
+              Platform
+            </span>
+
             <b>GY Data</b>
           </div>
 
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Environment</span>
+            <span className="text-slate-500">
+              Environment
+            </span>
+
             <b>Production</b>
           </div>
 
           <div className="flex justify-between border-b border-slate-100 py-2">
-            <span className="text-slate-500">Access</span>
+            <span className="text-slate-500">
+              Access
+            </span>
+
             <b>Super Admin</b>
           </div>
         </div>
 
         <div className="mt-4 flex gap-2">
           <ActionButton
-            onClick={() => showNotice('General settings opened')}
+            onClick={() =>
+              showNotice(
+                'General settings opened'
+              )
+            }
             className="bg-slate-100 text-slate-700 hover:bg-slate-200"
           >
             General
@@ -914,7 +1238,11 @@ export default function SuperAdminDashboard() {
         <div className="mt-4 space-y-2">
           <button
             type="button"
-            onClick={() => showNotice('Maintenance controls opened')}
+            onClick={() =>
+              showNotice(
+                'Maintenance controls opened'
+              )
+            }
             className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
           >
             <span className="text-xs font-bold">
@@ -926,7 +1254,11 @@ export default function SuperAdminDashboard() {
 
           <button
             type="button"
-            onClick={() => showNotice('Backup controls opened')}
+            onClick={() =>
+              showNotice(
+                'Backup controls opened'
+              )
+            }
             className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
           >
             <span className="text-xs font-bold">
@@ -944,22 +1276,31 @@ export default function SuperAdminDashboard() {
     switch (section) {
       case 'users':
         return renderUsers();
+
       case 'wallet':
         return renderWallet();
+
       case 'transactions':
         return renderTransactions();
+
       case 'revenue':
         return renderRevenue();
+
       case 'funding':
         return renderFunding();
+
       case 'admins':
         return renderAdmins();
+
       case 'security':
         return renderSecurity();
+
       case 'notifications':
         return renderNotifications();
+
       case 'settings':
         return renderSettings();
+
       case 'overview':
       default:
         return renderOverview();
@@ -970,7 +1311,9 @@ export default function SuperAdminDashboard() {
     <div className="min-h-screen bg-[#f5f7fb] text-slate-800">
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[250px] bg-[#061337] text-white shadow-2xl transition-transform ${
-          mobileMenu ? 'translate-x-0' : '-translate-x-full'
+          mobileMenu
+            ? 'translate-x-0'
+            : '-translate-x-full'
         } lg:translate-x-0`}
       >
         <div className="flex h-full flex-col">
@@ -992,7 +1335,9 @@ export default function SuperAdminDashboard() {
 
               <button
                 type="button"
-                onClick={() => setMobileMenu(false)}
+                onClick={() =>
+                  setMobileMenu(false)
+                }
                 className="ml-auto rounded-lg bg-white/10 p-2 lg:hidden"
                 aria-label="Close menu"
               >
@@ -1009,13 +1354,16 @@ export default function SuperAdminDashboard() {
             <div className="space-y-0.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const active = section === item.id;
+                const active =
+                  section === item.id;
 
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => goTo(item.id)}
+                    onClick={() =>
+                      goTo(item.id)
+                    }
                     className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-xs font-semibold transition ${
                       active
                         ? 'bg-blue-600 text-white'
@@ -1055,7 +1403,9 @@ export default function SuperAdminDashboard() {
           <div className="flex h-[68px] items-center gap-3 px-4 sm:px-5">
             <button
               type="button"
-              onClick={() => setMobileMenu(true)}
+              onClick={() =>
+                setMobileMenu(true)
+              }
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 lg:hidden"
               aria-label="Open menu"
             >
@@ -1074,7 +1424,9 @@ export default function SuperAdminDashboard() {
 
             <button
               type="button"
-              onClick={() => goTo('notifications')}
+              onClick={() =>
+                goTo('notifications')
+              }
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600"
               aria-label="Notifications"
             >
@@ -1083,7 +1435,9 @@ export default function SuperAdminDashboard() {
 
             <button
               type="button"
-              onClick={() => goTo('settings')}
+              onClick={() =>
+                goTo('settings')
+              }
               className="hidden h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 sm:flex"
             >
               <Settings className="h-3.5 w-3.5" />
@@ -1110,7 +1464,9 @@ export default function SuperAdminDashboard() {
 
             {section !== 'overview' && (
               <ActionButton
-                onClick={() => goTo('overview')}
+                onClick={() =>
+                  goTo('overview')
+                }
                 className="bg-white text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
               >
                 Overview
