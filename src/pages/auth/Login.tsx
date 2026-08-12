@@ -1,15 +1,20 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState(["", "", "", "", "", ""]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const superAdminTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const superAdminTimer =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ==========================================
   // PHONE NUMBER
@@ -19,8 +24,10 @@ export default function Login() {
     const cleaned = value.replace(/\D/g, "").slice(0, 11);
 
     setPhone(cleaned);
+    setError("");
 
-    // Automatically move to PIN after 11 digits
+    // Automatically focus first PIN box
+    // after the 11th phone digit.
     if (cleaned.length === 11) {
       setTimeout(() => {
         pinRefs.current[0]?.focus();
@@ -32,15 +39,26 @@ export default function Login() {
   // PIN
   // ==========================================
 
-  const handlePinChange = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, "").slice(-1);
+  const handlePinChange = (
+    index: number,
+    value: string
+  ) => {
+    const digits = value.replace(/\D/g, "");
+
+    if (!digits) {
+      return;
+    }
+
+    const digit = digits.slice(-1);
 
     const newPin = [...pin];
     newPin[index] = digit;
-    setPin(newPin);
 
-    // Automatically move to next PIN box
-    if (digit && index < 5) {
+    setPin(newPin);
+    setError("");
+
+    // Automatically move forward
+    if (index < 5) {
       setTimeout(() => {
         pinRefs.current[index + 1]?.focus();
       }, 20);
@@ -51,11 +69,15 @@ export default function Login() {
     index: number,
     event: KeyboardEvent<HTMLInputElement>
   ) => {
-    // Backspace automatically moves backwards
-    if (event.key === "Backspace" && !pin[index] && index > 0) {
+    if (
+      event.key === "Backspace" &&
+      !pin[index] &&
+      index > 0
+    ) {
       const newPin = [...pin];
 
       newPin[index - 1] = "";
+
       setPin(newPin);
 
       setTimeout(() => {
@@ -65,32 +87,67 @@ export default function Login() {
   };
 
   // ==========================================
-  // LOGIN
+  // REAL LOGIN
   // ==========================================
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    setError("");
+
     if (phone.length !== 11) {
-      alert("Please enter your 11-digit phone number.");
+      setError(
+        "Please enter your 11-digit phone number."
+      );
       return;
     }
 
     const fullPin = pin.join("");
 
     if (fullPin.length !== 6) {
-      alert("Please enter your 6-digit PIN.");
+      setError(
+        "Please enter your 6-digit PIN."
+      );
       return;
     }
 
-    /*
-      CONNECT YOUR EXISTING LOGIN/AUTH FUNCTION HERE.
+    setLoading(true);
 
-      We are NOT changing your backend/authentication system here.
-    */
+    try {
+      /*
+       * THIS IS THE EXISTING REAL AUTHENTICATION.
+       *
+       * It calls:
+       * POST /api/auth/login
+       */
+      const result = await login(
+        phone,
+        fullPin
+      );
 
-    console.log("Login attempt:", {
-      phone,
-      pin: fullPin,
-    });
+      if (result.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+
+      /*
+       * AuthContext already saves the user session.
+       * Going home is therefore safe.
+       */
+      navigate("/", {
+        replace: true,
+      });
+    } catch (err) {
+      console.error(
+        "Login failed:",
+        err
+      );
+
+      setError(
+        "Unable to connect to server. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ==========================================
@@ -100,24 +157,36 @@ export default function Login() {
 
   const startSuperAdminPress = () => {
     if (superAdminTimer.current) {
-      clearTimeout(superAdminTimer.current);
+      clearTimeout(
+        superAdminTimer.current
+      );
     }
 
-    superAdminTimer.current = setTimeout(() => {
-      navigate("/super-admin");
-      superAdminTimer.current = null;
-    }, 3000);
+    superAdminTimer.current =
+      setTimeout(() => {
+        navigate(
+          "/super-admin-login"
+        );
+
+        superAdminTimer.current = null;
+      }, 3000);
   };
 
   const cancelSuperAdminPress = () => {
     if (superAdminTimer.current) {
-      clearTimeout(superAdminTimer.current);
+      clearTimeout(
+        superAdminTimer.current
+      );
+
       superAdminTimer.current = null;
     }
   };
 
-  const phoneComplete = phone.length === 11;
-  const pinComplete = pin.join("").length === 6;
+  const phoneComplete =
+    phone.length === 11;
+
+  const pinComplete =
+    pin.join("").length === 6;
 
   return (
     <div
@@ -133,35 +202,56 @@ export default function Login() {
     >
 
       {/* ==========================================
-          GY DATA
+          BRAND
       =========================================== */}
 
-      <div className="mt-8 text-center z-10">
-
+      <div
+        className="
+          mt-8
+          text-center
+          z-10
+        "
+      >
         <img
           src="/logo.png"
           alt="GY DATA"
-          className="w-24 mx-auto"
+          className="
+            w-24
+            mx-auto
+          "
         />
 
-        <h1 className="text-blue-500 text-lg font-bold mt-1">
+        <h1
+          className="
+            text-blue-500
+            text-lg
+            font-bold
+            mt-1
+          "
+        >
           GY DATA
         </h1>
 
-        <p className="text-white/70 text-xs mt-1">
+        <p
+          className="
+            text-white/70
+            text-xs
+            mt-1
+          "
+        >
           Endless Joy
         </p>
-
       </div>
 
       {/* ==========================================
-          WHITE LOGIN CARD - 70%
+          WHITE LOGIN CARD
+          80%
       =========================================== */}
 
       <div
         className="
           bg-white
-          w-[70%]
+          w-[80%]
           max-w-sm
           rounded-[24px]
           mt-6
@@ -223,7 +313,13 @@ export default function Login() {
           "
         >
 
-          <span className="px-2 border-r text-gray-700">
+          <span
+            className="
+              px-2
+              border-r
+              text-gray-700
+            "
+          >
             +234
           </span>
 
@@ -233,7 +329,9 @@ export default function Login() {
             autoComplete="tel"
             value={phone}
             onChange={(event) =>
-              handlePhoneChange(event.target.value)
+              handlePhoneChange(
+                event.target.value
+              )
             }
             maxLength={11}
             className="
@@ -250,7 +348,7 @@ export default function Login() {
         </div>
 
         {/* ==========================================
-            PIN SECTION
+            PIN
         =========================================== */}
 
         <div
@@ -298,62 +396,89 @@ export default function Login() {
             "
           >
 
-            {pin.map((digit, index) => (
-              <input
-                key={index}
-                ref={(element) => {
-                  pinRefs.current[index] = element;
-                }}
-                type="text"
-                inputMode="numeric"
-                autoComplete={
-                  index === 0
-                    ? "one-time-code"
-                    : "off"
-                }
-                maxLength={1}
-                value={digit ? "•" : ""}
-                disabled={!phoneComplete}
-                onChange={(event) =>
-                  handlePinChange(
-                    index,
-                    event.target.value
-                  )
-                }
-                onKeyDown={(event) =>
-                  handlePinKeyDown(
-                    index,
-                    event
-                  )
-                }
-                className="
-                  w-9
-                  h-10
-                  border
-                  rounded-lg
-                  text-center
-                  outline-none
-                  text-blue-900
-                  text-xl
-                  font-bold
-                  bg-white
-                  focus:border-blue-500
-                  focus:ring-1
-                  focus:ring-blue-300
-                  disabled:bg-gray-100
-                "
-                aria-label={`PIN digit ${index + 1}`}
-              />
-            ))}
+            {pin.map(
+              (digit, index) => (
+                <input
+                  key={index}
+                  ref={(element) => {
+                    pinRefs.current[
+                      index
+                    ] = element;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete={
+                    index === 0
+                      ? "one-time-code"
+                      : "off"
+                  }
+                  maxLength={1}
+                  value={
+                    digit ? "•" : ""
+                  }
+                  disabled={
+                    !phoneComplete
+                  }
+                  onChange={(event) =>
+                    handlePinChange(
+                      index,
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={(event) =>
+                    handlePinKeyDown(
+                      index,
+                      event
+                    )
+                  }
+                  className="
+                    w-9
+                    h-10
+                    border
+                    rounded-lg
+                    text-center
+                    outline-none
+                    text-blue-900
+                    text-xl
+                    font-bold
+                    bg-white
+                    focus:border-blue-500
+                    focus:ring-1
+                    focus:ring-blue-300
+                    disabled:bg-gray-100
+                  "
+                  aria-label={`PIN digit ${
+                    index + 1
+                  }`}
+                />
+              )
+            )}
 
           </div>
+
+          {/* ERROR */}
+
+          {error && (
+            <p
+              className="
+                text-center
+                text-red-500
+                text-xs
+                mt-3
+              "
+            >
+              {error}
+            </p>
+          )}
 
           {/* FORGOT PIN */}
 
           <button
             type="button"
             onClick={() => {
-              navigate("/forgot-pin");
+              setError(
+                "Please contact GY DATA Support to reset your PIN."
+              );
             }}
             className="
               block
@@ -370,13 +495,17 @@ export default function Login() {
           </button>
 
           {/* ==========================================
-              CONTINUE - UNDER PIN
+              CONTINUE
           =========================================== */}
 
           <button
             type="button"
             onClick={handleContinue}
-            disabled={!phoneComplete || !pinComplete}
+            disabled={
+              !phoneComplete ||
+              !pinComplete ||
+              loading
+            }
             className="
               w-full
               h-10
@@ -392,7 +521,9 @@ export default function Login() {
               cursor-pointer
             "
           >
-            Continue →
+            {loading
+              ? "Logging in..."
+              : "Continue →"}
           </button>
 
         </div>
@@ -412,13 +543,19 @@ export default function Login() {
         "
       >
 
-        <span className="text-white/70">
+        <span
+          className="
+            text-white/70
+          "
+        >
           Don't have an account?{" "}
         </span>
 
         <button
           type="button"
-          onClick={() => navigate("/signup")}
+          onClick={() =>
+            navigate("/register")
+          }
           className="
             text-blue-400
             font-semibold
@@ -427,7 +564,7 @@ export default function Login() {
             cursor-pointer
           "
         >
-          Sign up
+          Create Account
         </button>
 
       </div>
@@ -438,7 +575,11 @@ export default function Login() {
 
       <button
         type="button"
-        onClick={() => navigate("/support")}
+        onClick={() =>
+          setError(
+            "Please login first to access Support."
+          )
+        }
         className="
           z-10
           mt-2
@@ -453,7 +594,7 @@ export default function Login() {
       </button>
 
       {/* ==========================================
-          FADED DECORATIVE CIRCLES + STARS
+          FADED DECORATIONS
       =========================================== */}
 
       <div
@@ -468,7 +609,7 @@ export default function Login() {
         "
       >
 
-        {/* CYAN CIRCLE */}
+        {/* CYAN */}
 
         <div
           className="
@@ -478,13 +619,12 @@ export default function Login() {
             w-16
             h-16
             rounded-full
-            opacity-55
+            opacity-30
             bg-[radial-gradient(circle_at_32%_25%,#d9fbff_0%,#75d9ea_24%,#16a8c7_58%,#08738f_100%)]
-            shadow-[inset_-8px_-10px_14px_rgba(0,0,0,0.18),inset_8px_8px_12px_rgba(255,255,255,0.45),0_8px_18px_rgba(0,0,0,0.22)]
           "
         />
 
-        {/* PURPLE CIRCLE */}
+        {/* PURPLE */}
 
         <div
           className="
@@ -494,9 +634,8 @@ export default function Login() {
             w-11
             h-11
             rounded-full
-            opacity-50
+            opacity-25
             bg-[radial-gradient(circle_at_32%_25%,#f0d9ff_0%,#b76be8_28%,#792bc0_65%,#4b1680_100%)]
-            shadow-[inset_-6px_-7px_10px_rgba(0,0,0,0.2),inset_6px_6px_9px_rgba(255,255,255,0.4),0_7px_15px_rgba(0,0,0,0.2)]
           "
         />
 
@@ -509,7 +648,7 @@ export default function Login() {
             bottom-16
             w-8
             h-8
-            opacity-50
+            opacity-25
             bg-[radial-gradient(circle_at_35%_25%,#fff6a3_0%,#ffd21c_45%,#e69b00_100%)]
           "
           style={{
@@ -518,7 +657,7 @@ export default function Login() {
           }}
         />
 
-        {/* SMALL CYAN CIRCLE */}
+        {/* SMALL CYAN */}
 
         <div
           className="
@@ -528,14 +667,14 @@ export default function Login() {
             w-6
             h-6
             rounded-full
-            opacity-45
+            opacity-25
             bg-[radial-gradient(circle_at_32%_25%,#d7fbff_0%,#5dd0e3_35%,#168ca8_100%)]
           "
         />
 
         {/* ==========================================
-            SMALL ORANGE CIRCLE
-            3 SECOND LONG PRESS
+            ORANGE SUPER ADMIN CIRCLE
+            20% + 3 SECOND LONG PRESS
         =========================================== */}
 
         <div
@@ -546,16 +685,23 @@ export default function Login() {
             w-16
             h-16
             rounded-full
-            opacity-55
+            opacity-20
             pointer-events-auto
             touch-none
             bg-[radial-gradient(circle_at_32%_25%,#fff0c9_0%,#ffc45b_25%,#f39a17_58%,#b95d00_100%)]
-            shadow-[inset_-7px_-9px_13px_rgba(0,0,0,0.2),inset_7px_7px_11px_rgba(255,255,255,0.45),0_7px_16px_rgba(0,0,0,0.22)]
           "
-          onPointerDown={startSuperAdminPress}
-          onPointerUp={cancelSuperAdminPress}
-          onPointerLeave={cancelSuperAdminPress}
-          onPointerCancel={cancelSuperAdminPress}
+          onPointerDown={
+            startSuperAdminPress
+          }
+          onPointerUp={
+            cancelSuperAdminPress
+          }
+          onPointerLeave={
+            cancelSuperAdminPress
+          }
+          onPointerCancel={
+            cancelSuperAdminPress
+          }
           role="button"
           aria-label="Super Admin"
         />
@@ -569,7 +715,7 @@ export default function Login() {
             bottom-28
             w-12
             h-12
-            opacity-50
+            opacity-25
             bg-[radial-gradient(circle_at_35%_25%,#ffd8ff_0%,#ee72d8_38%,#b22aa6_72%,#73156f_100%)]
           "
           style={{
@@ -580,9 +726,7 @@ export default function Login() {
 
       </div>
 
-      {/* ==========================================
-          SOFT BACKGROUND CIRCLE
-      =========================================== */}
+      {/* SOFT BACKGROUND CIRCLE */}
 
       <div
         className="
@@ -593,26 +737,10 @@ export default function Login() {
           h-64
           rounded-full
           bg-blue-900/40
-          opacity-30
+          opacity-20
           pointer-events-none
         "
       />
-
-      {/* ==========================================
-          COPYRIGHT
-      =========================================== */}
-
-      <p
-        className="
-          absolute
-          bottom-2
-          z-10
-          text-white/50
-          text-[10px]
-        "
-      >
-        © 2025 GY Data. All rights reserved.
-      </p>
 
     </div>
   );
