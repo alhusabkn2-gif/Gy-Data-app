@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
@@ -10,19 +11,26 @@ export default function Login() {
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
   const superAdminTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const phoneIsComplete = phone.replace(/\D/g, "").length >= 10;
+  // ==========================================
+  // PHONE NUMBER
+  // ==========================================
 
   const handlePhoneChange = (value: string) => {
-    const cleaned = value.replace(/\D/g, "").slice(0, 10);
+    const cleaned = value.replace(/\D/g, "").slice(0, 11);
+
     setPhone(cleaned);
 
-    // Automatically focus the first PIN box when phone is complete
-    if (cleaned.length === 10) {
+    // Automatically move to PIN after 11 digits
+    if (cleaned.length === 11) {
       setTimeout(() => {
         pinRefs.current[0]?.focus();
       }, 100);
     }
   };
+
+  // ==========================================
+  // PIN
+  // ==========================================
 
   const handlePinChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, "").slice(-1);
@@ -31,7 +39,7 @@ export default function Login() {
     newPin[index] = digit;
     setPin(newPin);
 
-    // Automatically move to the next PIN box
+    // Automatically move to next PIN box
     if (digit && index < 5) {
       setTimeout(() => {
         pinRefs.current[index + 1]?.focus();
@@ -41,11 +49,12 @@ export default function Login() {
 
   const handlePinKeyDown = (
     index: number,
-    e: React.KeyboardEvent<HTMLInputElement>
+    event: KeyboardEvent<HTMLInputElement>
   ) => {
-    // Go backwards automatically with backspace
-    if (e.key === "Backspace" && !pin[index] && index > 0) {
+    // Backspace automatically moves backwards
+    if (event.key === "Backspace" && !pin[index] && index > 0) {
       const newPin = [...pin];
+
       newPin[index - 1] = "";
       setPin(newPin);
 
@@ -55,29 +64,39 @@ export default function Login() {
     }
   };
 
-  const handleContinue = () => {
-    const fullPin = pin.join("");
+  // ==========================================
+  // LOGIN
+  // ==========================================
 
-    if (!phoneIsComplete) {
-      alert("Please enter your phone number.");
+  const handleContinue = () => {
+    if (phone.length !== 11) {
+      alert("Please enter your 11-digit phone number.");
       return;
     }
+
+    const fullPin = pin.join("");
 
     if (fullPin.length !== 6) {
       alert("Please enter your 6-digit PIN.");
       return;
     }
 
-    // Keep the existing login flow ready for backend connection
-    console.log("Login:", {
+    /*
+      CONNECT YOUR EXISTING LOGIN/AUTH FUNCTION HERE.
+
+      We are NOT changing your backend/authentication system here.
+    */
+
+    console.log("Login attempt:", {
       phone,
       pin: fullPin,
     });
   };
 
-  // ==============================
-  // SUPER ADMIN LONG PRESS
-  // ==============================
+  // ==========================================
+  // SUPER ADMIN
+  // 3 SECOND LONG PRESS
+  // ==========================================
 
   const startSuperAdminPress = () => {
     if (superAdminTimer.current) {
@@ -87,7 +106,7 @@ export default function Login() {
     superAdminTimer.current = setTimeout(() => {
       navigate("/super-admin");
       superAdminTimer.current = null;
-    }, 2000);
+    }, 3000);
   };
 
   const cancelSuperAdminPress = () => {
@@ -97,14 +116,28 @@ export default function Login() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#020b2d] flex flex-col items-center relative overflow-hidden">
+  const phoneComplete = phone.length === 11;
+  const pinComplete = pin.join("").length === 6;
 
-      {/* =========================
+  return (
+    <div
+      className="
+        min-h-screen
+        bg-[#020b2d]
+        flex
+        flex-col
+        items-center
+        relative
+        overflow-hidden
+      "
+    >
+
+      {/* ==========================================
           GY DATA
-      ========================== */}
+      =========================================== */}
 
       <div className="mt-8 text-center z-10">
+
         <img
           src="/logo.png"
           alt="GY DATA"
@@ -118,11 +151,12 @@ export default function Login() {
         <p className="text-white/70 text-xs mt-1">
           Endless Joy
         </p>
+
       </div>
 
-      {/* =========================
-          LOGIN CARD
-      ========================== */}
+      {/* ==========================================
+          WHITE LOGIN CARD - 70%
+      =========================================== */}
 
       <div
         className="
@@ -137,17 +171,42 @@ export default function Login() {
         "
       >
 
-        <h1 className="text-center text-[#061442] text-xl font-bold">
+        {/* TITLE */}
+
+        <h1
+          className="
+            text-center
+            text-[#061442]
+            text-xl
+            font-bold
+          "
+        >
           Welcome Back
         </h1>
 
-        <p className="text-center text-gray-400 text-xs mt-1">
+        <p
+          className="
+            text-center
+            text-gray-400
+            text-xs
+            mt-1
+          "
+        >
           Enter your phone number to continue
         </p>
 
-        {/* PHONE NUMBER */}
+        {/* ==========================================
+            PHONE NUMBER
+        =========================================== */}
 
-        <label className="block mt-4 text-xs text-gray-700">
+        <label
+          className="
+            block
+            mt-4
+            text-xs
+            text-gray-700
+          "
+        >
           Phone Number
         </label>
 
@@ -160,51 +219,84 @@ export default function Login() {
             h-10
             mt-1
             text-xs
+            bg-white
           "
         >
-          <span className="px-2 border-r">
+
+          <span className="px-2 border-r text-gray-700">
             +234
           </span>
 
           <input
             type="tel"
             inputMode="numeric"
+            autoComplete="tel"
             value={phone}
-            onChange={(e) => handlePhoneChange(e.target.value)}
-            maxLength={10}
+            onChange={(event) =>
+              handlePhoneChange(event.target.value)
+            }
+            maxLength={11}
             className="
               flex-1
               outline-none
               px-2
               w-full
+              text-gray-800
+              bg-transparent
             "
-            placeholder="801 234 5678"
+            placeholder="80327320007"
           />
+
         </div>
 
-        {/* =========================
+        {/* ==========================================
             PIN SECTION
-        ========================== */}
+        =========================================== */}
 
         <div
           className={`
             transition-all
             duration-300
-            ${phoneIsComplete ? "opacity-100" : "opacity-50"}
+            ${
+              phoneComplete
+                ? "opacity-100"
+                : "opacity-50"
+            }
           `}
         >
 
-          <h2 className="text-center text-[#061442] text-sm font-bold mt-5">
+          <h2
+            className="
+              text-center
+              text-[#061442]
+              text-sm
+              font-bold
+              mt-5
+            "
+          >
             Enter PIN
           </h2>
 
-          <p className="text-center text-gray-400 text-xs">
+          <p
+            className="
+              text-center
+              text-gray-400
+              text-xs
+            "
+          >
             Enter your 6-digit Login PIN
           </p>
 
           {/* PIN BOXES */}
 
-          <div className="flex justify-center gap-2 mt-3">
+          <div
+            className="
+              flex
+              justify-center
+              gap-2
+              mt-3
+            "
+          >
 
             {pin.map((digit, index) => (
               <input
@@ -212,27 +304,42 @@ export default function Login() {
                 ref={(element) => {
                   pinRefs.current[index] = element;
                 }}
-                type="password"
+                type="text"
                 inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                disabled={!phoneIsComplete}
-                onChange={(e) =>
-                  handlePinChange(index, e.target.value)
+                autoComplete={
+                  index === 0
+                    ? "one-time-code"
+                    : "off"
                 }
-                onKeyDown={(e) =>
-                  handlePinKeyDown(index, e)
+                maxLength={1}
+                value={digit ? "•" : ""}
+                disabled={!phoneComplete}
+                onChange={(event) =>
+                  handlePinChange(
+                    index,
+                    event.target.value
+                  )
+                }
+                onKeyDown={(event) =>
+                  handlePinKeyDown(
+                    index,
+                    event
+                  )
                 }
                 className="
-                  w-7
-                  h-8
+                  w-9
+                  h-10
                   border
-                  rounded-md
+                  rounded-lg
                   text-center
                   outline-none
                   text-blue-900
-                  text-xs
+                  text-xl
+                  font-bold
+                  bg-white
                   focus:border-blue-500
+                  focus:ring-1
+                  focus:ring-blue-300
                   disabled:bg-gray-100
                 "
                 aria-label={`PIN digit ${index + 1}`}
@@ -246,9 +353,7 @@ export default function Login() {
           <button
             type="button"
             onClick={() => {
-              alert(
-                "Please contact GY DATA support to reset your PIN."
-              );
+              navigate("/forgot-pin");
             }}
             className="
               block
@@ -258,19 +363,20 @@ export default function Login() {
               text-xs
               bg-transparent
               border-0
+              cursor-pointer
             "
           >
             Forgot PIN?
           </button>
 
-          {/* =========================
-              CONTINUE
-          ========================== */}
+          {/* ==========================================
+              CONTINUE - UNDER PIN
+          =========================================== */}
 
           <button
             type="button"
             onClick={handleContinue}
-            disabled={!phoneIsComplete || pin.join("").length !== 6}
+            disabled={!phoneComplete || !pinComplete}
             className="
               w-full
               h-10
@@ -283,17 +389,72 @@ export default function Login() {
               disabled:opacity-40
               active:scale-[0.98]
               transition
+              cursor-pointer
             "
           >
             Continue →
           </button>
 
         </div>
+
       </div>
 
-      {/* ==================================================
-          BOTTOM DECORATIVE CIRCLES + STARS
-      =================================================== */}
+      {/* ==========================================
+          CREATE ACCOUNT
+      =========================================== */}
+
+      <div
+        className="
+          z-10
+          mt-5
+          text-center
+          text-sm
+        "
+      >
+
+        <span className="text-white/70">
+          Don't have an account?{" "}
+        </span>
+
+        <button
+          type="button"
+          onClick={() => navigate("/signup")}
+          className="
+            text-blue-400
+            font-semibold
+            bg-transparent
+            border-0
+            cursor-pointer
+          "
+        >
+          Sign up
+        </button>
+
+      </div>
+
+      {/* ==========================================
+          SUPPORT
+      =========================================== */}
+
+      <button
+        type="button"
+        onClick={() => navigate("/support")}
+        className="
+          z-10
+          mt-2
+          text-white/60
+          text-xs
+          bg-transparent
+          border-0
+          cursor-pointer
+        "
+      >
+        Need help? Contact Support
+      </button>
+
+      {/* ==========================================
+          FADED DECORATIVE CIRCLES + STARS
+      =========================================== */}
 
       <div
         className="
@@ -317,6 +478,7 @@ export default function Login() {
             w-16
             h-16
             rounded-full
+            opacity-55
             bg-[radial-gradient(circle_at_32%_25%,#d9fbff_0%,#75d9ea_24%,#16a8c7_58%,#08738f_100%)]
             shadow-[inset_-8px_-10px_14px_rgba(0,0,0,0.18),inset_8px_8px_12px_rgba(255,255,255,0.45),0_8px_18px_rgba(0,0,0,0.22)]
           "
@@ -332,6 +494,7 @@ export default function Login() {
             w-11
             h-11
             rounded-full
+            opacity-50
             bg-[radial-gradient(circle_at_32%_25%,#f0d9ff_0%,#b76be8_28%,#792bc0_65%,#4b1680_100%)]
             shadow-[inset_-6px_-7px_10px_rgba(0,0,0,0.2),inset_6px_6px_9px_rgba(255,255,255,0.4),0_7px_15px_rgba(0,0,0,0.2)]
           "
@@ -346,8 +509,8 @@ export default function Login() {
             bottom-16
             w-8
             h-8
+            opacity-50
             bg-[radial-gradient(circle_at_35%_25%,#fff6a3_0%,#ffd21c_45%,#e69b00_100%)]
-            shadow-[inset_-3px_-4px_6px_rgba(0,0,0,0.18),inset_3px_3px_5px_rgba(255,255,255,0.5),0_5px_10px_rgba(0,0,0,0.2)]
           "
           style={{
             clipPath:
@@ -365,28 +528,29 @@ export default function Login() {
             w-6
             h-6
             rounded-full
+            opacity-45
             bg-[radial-gradient(circle_at_32%_25%,#d7fbff_0%,#5dd0e3_35%,#168ca8_100%)]
-            shadow-[inset_-3px_-4px_6px_rgba(0,0,0,0.18),inset_3px_3px_5px_rgba(255,255,255,0.45),0_4px_9px_rgba(0,0,0,0.18)]
           "
         />
 
-        {/* ==================================================
-            LARGE RIGHT CIRCLE
-            SUPER ADMIN — 2 SECOND LONG PRESS
-        =================================================== */}
+        {/* ==========================================
+            SMALL ORANGE CIRCLE
+            3 SECOND LONG PRESS
+        =========================================== */}
 
         <div
           className="
             absolute
-            right-[8%]
+            right-[9%]
             bottom-8
-            w-20
-            h-20
+            w-16
+            h-16
             rounded-full
-            bg-[radial-gradient(circle_at_32%_25%,#fff0c9_0%,#ffc45b_25%,#f39a17_58%,#b95d00_100%)]
-            shadow-[inset_-9px_-11px_16px_rgba(0,0,0,0.2),inset_9px_8px_13px_rgba(255,255,255,0.45),0_9px_20px_rgba(0,0,0,0.22)]
+            opacity-55
             pointer-events-auto
             touch-none
+            bg-[radial-gradient(circle_at_32%_25%,#fff0c9_0%,#ffc45b_25%,#f39a17_58%,#b95d00_100%)]
+            shadow-[inset_-7px_-9px_13px_rgba(0,0,0,0.2),inset_7px_7px_11px_rgba(255,255,255,0.45),0_7px_16px_rgba(0,0,0,0.22)]
           "
           onPointerDown={startSuperAdminPress}
           onPointerUp={cancelSuperAdminPress}
@@ -405,8 +569,8 @@ export default function Login() {
             bottom-28
             w-12
             h-12
+            opacity-50
             bg-[radial-gradient(circle_at_35%_25%,#ffd8ff_0%,#ee72d8_38%,#b22aa6_72%,#73156f_100%)]
-            shadow-[inset_-5px_-6px_9px_rgba(0,0,0,0.2),inset_5px_5px_8px_rgba(255,255,255,0.45),0_7px_14px_rgba(0,0,0,0.22)]
           "
           style={{
             clipPath:
@@ -416,7 +580,9 @@ export default function Login() {
 
       </div>
 
-      {/* ORIGINAL BOTTOM CIRCLE */}
+      {/* ==========================================
+          SOFT BACKGROUND CIRCLE
+      =========================================== */}
 
       <div
         className="
@@ -427,8 +593,26 @@ export default function Login() {
           h-64
           rounded-full
           bg-blue-900/40
+          opacity-30
+          pointer-events-none
         "
       />
+
+      {/* ==========================================
+          COPYRIGHT
+      =========================================== */}
+
+      <p
+        className="
+          absolute
+          bottom-2
+          z-10
+          text-white/50
+          text-[10px]
+        "
+      >
+        © 2025 GY Data. All rights reserved.
+      </p>
 
     </div>
   );
