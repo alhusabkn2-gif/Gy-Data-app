@@ -1,12 +1,89 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
 
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState(["", "", "", "", "", ""]);
+
+  const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
   const superAdminTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const phoneIsComplete = phone.replace(/\D/g, "").length >= 10;
+
+  const handlePhoneChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, "").slice(0, 10);
+    setPhone(cleaned);
+
+    // Automatically focus the first PIN box when phone is complete
+    if (cleaned.length === 10) {
+      setTimeout(() => {
+        pinRefs.current[0]?.focus();
+      }, 100);
+    }
+  };
+
+  const handlePinChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+
+    const newPin = [...pin];
+    newPin[index] = digit;
+    setPin(newPin);
+
+    // Automatically move to the next PIN box
+    if (digit && index < 5) {
+      setTimeout(() => {
+        pinRefs.current[index + 1]?.focus();
+      }, 20);
+    }
+  };
+
+  const handlePinKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    // Go backwards automatically with backspace
+    if (e.key === "Backspace" && !pin[index] && index > 0) {
+      const newPin = [...pin];
+      newPin[index - 1] = "";
+      setPin(newPin);
+
+      setTimeout(() => {
+        pinRefs.current[index - 1]?.focus();
+      }, 20);
+    }
+  };
+
+  const handleContinue = () => {
+    const fullPin = pin.join("");
+
+    if (!phoneIsComplete) {
+      alert("Please enter your phone number.");
+      return;
+    }
+
+    if (fullPin.length !== 6) {
+      alert("Please enter your 6-digit PIN.");
+      return;
+    }
+
+    // Keep the existing login flow ready for backend connection
+    console.log("Login:", {
+      phone,
+      pin: fullPin,
+    });
+  };
+
+  // ==============================
+  // SUPER ADMIN LONG PRESS
+  // ==============================
+
   const startSuperAdminPress = () => {
+    if (superAdminTimer.current) {
+      clearTimeout(superAdminTimer.current);
+    }
+
     superAdminTimer.current = setTimeout(() => {
       navigate("/super-admin");
       superAdminTimer.current = null;
@@ -24,8 +101,9 @@ export default function Login() {
     <div className="min-h-screen bg-[#020b2d] flex flex-col items-center relative overflow-hidden">
 
       {/* =========================
-          GY DATA LOGO / NAME
+          GY DATA
       ========================== */}
+
       <div className="mt-8 text-center z-10">
         <img
           src="/logo.png"
@@ -43,9 +121,9 @@ export default function Login() {
       </div>
 
       {/* =========================
-          WHITE LOGIN CARD
-          DESIGN / SIZE KEPT
+          LOGIN CARD
       ========================== */}
+
       <div
         className="
           bg-white
@@ -67,7 +145,8 @@ export default function Login() {
           Enter your phone number to continue
         </p>
 
-        {/* PHONE */}
+        {/* PHONE NUMBER */}
+
         <label className="block mt-4 text-xs text-gray-700">
           Phone Number
         </label>
@@ -89,62 +168,33 @@ export default function Login() {
 
           <input
             type="tel"
-            className="flex-1 outline-none px-2 w-full"
+            inputMode="numeric"
+            value={phone}
+            onChange={(e) => handlePhoneChange(e.target.value)}
+            maxLength={10}
+            className="
+              flex-1
+              outline-none
+              px-2
+              w-full
+            "
             placeholder="801 234 5678"
           />
         </div>
 
-        {/* CONTINUE */}
-        <button
-          type="button"
-          onClick={() => {
-            const pin = document.getElementById("pin-section");
+        {/* =========================
+            PIN SECTION
+        ========================== */}
 
-            if (pin) {
-              pin.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-          }}
-          className="
-            w-full
-            h-10
-            bg-[#062c85]
-            text-white
-            rounded-lg
-            mt-4
-            text-sm
-            font-semibold
-            active:scale-[0.98]
-            transition
-          "
-        >
-          Continue →
-        </button>
-
-        {/* OR */}
         <div
-          className="
-            flex
-            items-center
-            gap-2
-            my-4
-            text-gray-400
-            text-xs
-          "
+          className={`
+            transition-all
+            duration-300
+            ${phoneIsComplete ? "opacity-100" : "opacity-50"}
+          `}
         >
-          <span className="flex-1 h-px bg-gray-300" />
 
-          OR
-
-          <span className="flex-1 h-px bg-gray-300" />
-        </div>
-
-        {/* PIN */}
-        <div id="pin-section">
-
-          <h2 className="text-center text-[#061442] text-sm font-bold">
+          <h2 className="text-center text-[#061442] text-sm font-bold mt-5">
             Enter PIN
           </h2>
 
@@ -152,14 +202,27 @@ export default function Login() {
             Enter your 6-digit Login PIN
           </p>
 
+          {/* PIN BOXES */}
+
           <div className="flex justify-center gap-2 mt-3">
 
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+            {pin.map((digit, index) => (
               <input
-                key={i}
+                key={index}
+                ref={(element) => {
+                  pinRefs.current[index] = element;
+                }}
                 type="password"
-                maxLength={1}
                 inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                disabled={!phoneIsComplete}
+                onChange={(e) =>
+                  handlePinChange(index, e.target.value)
+                }
+                onKeyDown={(e) =>
+                  handlePinKeyDown(index, e)
+                }
                 className="
                   w-7
                   h-8
@@ -170,14 +233,16 @@ export default function Login() {
                   text-blue-900
                   text-xs
                   focus:border-blue-500
+                  disabled:bg-gray-100
                 "
-                aria-label={`PIN digit ${i}`}
+                aria-label={`PIN digit ${index + 1}`}
               />
             ))}
 
           </div>
 
           {/* FORGOT PIN */}
+
           <button
             type="button"
             onClick={() => {
@@ -198,13 +263,38 @@ export default function Login() {
             Forgot PIN?
           </button>
 
+          {/* =========================
+              CONTINUE
+          ========================== */}
+
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={!phoneIsComplete || pin.join("").length !== 6}
+            className="
+              w-full
+              h-10
+              bg-[#062c85]
+              text-white
+              rounded-lg
+              mt-4
+              text-sm
+              font-semibold
+              disabled:opacity-40
+              active:scale-[0.98]
+              transition
+            "
+          >
+            Continue →
+          </button>
+
         </div>
       </div>
 
       {/* ==================================================
           BOTTOM DECORATIVE CIRCLES + STARS
-          VISUAL ONLY
       =================================================== */}
+
       <div
         className="
           absolute
@@ -218,6 +308,7 @@ export default function Login() {
       >
 
         {/* CYAN CIRCLE */}
+
         <div
           className="
             absolute
@@ -232,6 +323,7 @@ export default function Login() {
         />
 
         {/* PURPLE CIRCLE */}
+
         <div
           className="
             absolute
@@ -246,6 +338,7 @@ export default function Login() {
         />
 
         {/* YELLOW STAR */}
+
         <div
           className="
             absolute
@@ -263,6 +356,7 @@ export default function Login() {
         />
 
         {/* SMALL CYAN CIRCLE */}
+
         <div
           className="
             absolute
@@ -278,8 +372,9 @@ export default function Login() {
 
         {/* ==================================================
             LARGE RIGHT CIRCLE
-            2 SECOND LONG PRESS = SUPER ADMIN
+            SUPER ADMIN — 2 SECOND LONG PRESS
         =================================================== */}
+
         <div
           className="
             absolute
@@ -302,6 +397,7 @@ export default function Login() {
         />
 
         {/* PINK STAR */}
+
         <div
           className="
             absolute
@@ -321,6 +417,7 @@ export default function Login() {
       </div>
 
       {/* ORIGINAL BOTTOM CIRCLE */}
+
       <div
         className="
           absolute
