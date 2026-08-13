@@ -1,8 +1,24 @@
 const express = require('express');
+
 const router = express.Router();
 
-const purchaseController = require('../controllers/purchaseController');
+const purchaseController =
+  require('../controllers/purchaseController');
 
-router.post('/', purchaseController.purchase);
+/*
+ * Customer data purchase.
+ */
+router.post(
+  '/',
+  purchaseController.purchase
+);
+
+/*
+ * ClubKonnect final-status callback.
+ */
+router.post(
+  '/clubkonnect/callback',
+  purchaseController.clubKonnectCallback
+);
 
 module.exports = router;
