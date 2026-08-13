@@ -1,23 +1,33 @@
 const express = require('express');
 const router = express.Router();
 
-const fundingController = require('../controllers/fundingController');
+const {
+  createFundingRequest,
+  getFundingRequests,
+  approveFunding,
+  rejectFunding,
+  adminAdjustWallet,
+} = require('../controllers/fundingController');
 
-/**
- * Funding Routes
- * Base URL: /api/funding
+/*
+ * CUSTOMER FUNDING
  */
+router.post('/request', createFundingRequest);
 
-// User submits funding request
-router.post('/request', fundingController.submitFundingRequest);
+/*
+ * SUPER ADMIN FUNDING MANAGEMENT
+ */
+router.get('/requests', getFundingRequests);
+router.post('/approve', approveFunding);
+router.post('/reject', rejectFunding);
 
-// Admin: List pending/all funding requests
-router.get('/requests', fundingController.listFundingRequests);
-
-// Admin: Approve funding request
-router.post('/approve', fundingController.approveFundingRequest);
-
-// Admin: Reject funding request
-router.post('/reject', fundingController.rejectFundingRequest);
+/*
+ * SUPER ADMIN DIRECT WALLET ADJUSTMENT
+ *
+ * type:
+ *   fund   = add money
+ *   refund = remove money
+ */
+router.post('/admin-adjust', adminAdjustWallet);
 
 module.exports = router;
