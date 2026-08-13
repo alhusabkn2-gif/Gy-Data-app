@@ -49,7 +49,7 @@ export default function BottomNav() {
     <>
       {/* Normal bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 sm:max-w-md sm:left-1/2 sm:-translate-x-1/2">
-        <div className="glass border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="border-t border-[#18345f] bg-[#07152f] px-2 py-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(7,21,47,0.18)]">
           <div className="flex items-center justify-around">
             {navItems.map((item) => {
               const active =
@@ -64,30 +64,30 @@ export default function BottomNav() {
                   key={item.path}
                   type="button"
                   onClick={() => navigate(item.path)}
-                  className="relative flex flex-col items-center gap-1 rounded-2xl px-4 py-2 transition-colors"
+                  className="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors"
                 >
                   {active && (
                     <motion.div
                       layoutId="navActive"
-                      className="absolute inset-0 rounded-2xl bg-primary-50 dark:bg-primary-500/10"
+                      className="absolute inset-0 rounded-xl bg-white/10"
                     />
                   )}
 
                   <Icon
                     className={cn(
-                      'relative h-5 w-5',
+                      'relative h-[18px] w-[18px]',
                       active
-                        ? 'text-primary-600 dark:text-primary-400'
-                        : 'text-slate-400 dark:text-slate-500',
+                        ? 'text-white'
+                        : 'text-white/45',
                     )}
                   />
 
                   <span
                     className={cn(
-                      'relative text-[10px] font-medium',
+                      'relative text-[9px] font-medium',
                       active
-                        ? 'text-primary-600 dark:text-primary-400'
-                        : 'text-slate-400 dark:text-slate-500',
+                        ? 'text-white'
+                        : 'text-white/45',
                     )}
                   >
                     {item.label}
