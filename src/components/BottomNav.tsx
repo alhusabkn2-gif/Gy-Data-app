@@ -49,8 +49,11 @@ export default function BottomNav() {
     <>
       {/* Normal bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 z-50 sm:max-w-md sm:left-1/2 sm:-translate-x-1/2">
-        <div className="border-t border-[#18345f] bg-[#07152f] px-2 py-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))] shadow-[0_-6px_20px_rgba(7,21,47,0.18)]">
+
+        <div className="border-t border-[#173766] bg-[#07152f] px-2 py-1 pb-[max(0.3rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(7,21,47,0.18)]">
+
           <div className="flex items-center justify-around">
+
             {navItems.map((item) => {
               const active =
                 location.pathname === item.path ||
@@ -66,6 +69,7 @@ export default function BottomNav() {
                   onClick={() => navigate(item.path)}
                   className="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors"
                 >
+
                   {active && (
                     <motion.div
                       layoutId="navActive"
@@ -92,10 +96,13 @@ export default function BottomNav() {
                   >
                     {item.label}
                   </span>
+
                 </button>
               );
             })}
+
           </div>
+
         </div>
       </div>
 
