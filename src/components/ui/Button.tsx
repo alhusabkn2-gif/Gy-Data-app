@@ -35,16 +35,16 @@ const variantClasses: Record<
   string
 > = {
   primary:
-    'bg-[#071d49] text-white shadow-lg shadow-[#071d49]/20 hover:bg-[#0b2a63] focus-visible:ring-[#071d49]/20',
+    'bg-[#102A56] text-white shadow-lg shadow-[#102A56]/15 hover:bg-[#183867] focus-visible:ring-[#102A56]/20',
 
   secondary:
-    'border border-slate-200 bg-white text-[#071d49] shadow-sm hover:bg-slate-50 focus-visible:ring-slate-300',
+    'border border-[#E4E8EE] bg-white text-[#102A56] shadow-sm hover:bg-[#F7F8FA] focus-visible:ring-[#E4E8EE]',
 
   outline:
-    'border border-[#071d49] bg-transparent text-[#071d49] hover:bg-[#071d49] hover:text-white focus-visible:ring-[#071d49]/20',
+    'border border-[#102A56] bg-transparent text-[#102A56] hover:bg-[#102A56] hover:text-white focus-visible:ring-[#102A56]/20',
 
   ghost:
-    'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-[#071d49] focus-visible:ring-slate-200',
+    'bg-transparent text-[#536174] hover:bg-[#F5F6F8] hover:text-[#102A56] focus-visible:ring-[#E4E8EE]',
 
   danger:
     'bg-red-500 text-white shadow-lg shadow-red-500/20 hover:bg-red-600 focus-visible:ring-red-500/20',
