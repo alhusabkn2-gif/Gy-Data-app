@@ -1,27 +1,21 @@
 :root {
-  /* ==========================================
-     GY-DATA — NAVY + ORANGE COLOR THEME
-     ========================================== */
-
-  /* Main background */
-  --bg-main: #F7F8FA;
+  --bg-main: #F5F6F8;
   --card-bg: #FFFFFF;
 
-  /* Main brand color */
+  /* Navy Blue */
   --primary: #102A56;
   --primary-dark: #0B2145;
-  --primary-light: #EAF0F8;
+  --primary-light: #E9EEF5;
 
-  /* Navy — used lightly */
   --navy: #102A56;
   --navy-light: #1B3A6B;
 
-  /* Orange — accent only */
+  /* Orange Accent */
   --accent: #F28C28;
-  --accent-light: #FFF1DF;
-  --accent-dark: #D96F0B;
+  --accent-light: #FFF1E3;
+  --accent-dark: #D97706;
 
-  /* Status colors */
+  /* Status */
   --success: #22A06B;
   --danger: #DC3545;
   --warning: #F28C28;
@@ -31,8 +25,8 @@
   --text-secondary: #536174;
   --text-muted: #8A95A5;
 
-  /* Borders */
-  --border: #E5E9EF;
+  /* Border */
+  --border: #E4E8EE;
 
   /* Radius */
   --radius-sm: 10px;
