@@ -1,7 +1,12 @@
-import { type InputHTMLAttributes, forwardRef, type ReactNode } from 'react';
+import {
+  type InputHTMLAttributes,
+  forwardRef,
+  type ReactNode,
+} from 'react';
 import { cn } from '../../lib/utils';
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps
+  extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: ReactNode;
@@ -9,42 +14,63 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, prefix, className, ...props }, ref) => {
+  (
+    {
+      label,
+      error,
+      icon,
+      prefix,
+      className,
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+          <label className="mb-1.5 block text-sm font-medium text-[#14213D]">
             {label}
           </label>
         )}
+
         <div className="relative">
           {icon && (
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A95A5]">
               {icon}
             </div>
           )}
+
           {prefix && (
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm font-medium pointer-events-none">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-[#8A95A5]">
               {prefix}
             </span>
           )}
+
           <input
             ref={ref}
             className={cn(
-              'w-full px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200',
+              'w-full rounded-2xl border bg-[#F7F8FA] px-4 py-3.5 text-[#14213D] placeholder-[#8A95A5] transition-all duration-200 focus:border-[#102A56] focus:outline-none focus:ring-2 focus:ring-[#102A56]/10',
               icon ? 'pl-11' : '',
               prefix ? 'pl-12' : '',
-              error ? 'border-error-300 dark:border-error-500/50' : 'border-slate-200 dark:border-slate-700',
+              error
+                ? 'border-[#DC3545]'
+                : 'border-[#E4E8EE]',
               className,
             )}
             {...props}
           />
         </div>
-        {error && <p className="mt-1.5 text-sm text-error-500">{error}</p>}
+
+        {error && (
+          <p className="mt-1.5 text-sm text-[#DC3545]">
+            {error}
+          </p>
+        )}
       </div>
     );
   },
 );
 
 Input.displayName = 'Input';
+
 export default Input;
