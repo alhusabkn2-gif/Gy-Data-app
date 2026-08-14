@@ -1,34 +1,34 @@
 const express = require('express');
+
 const router = express.Router();
 
-const purchaseController = require('../controllers/purchaseController');
+const purchaseController = require('../controllers/PurchaseController');
 
-/*
- * Customer data purchase
- *
- * POST /api/purchase
- */
+
+// =====================================================
+// DATA PURCHASE
+// =====================================================
+
 router.post(
   '/',
   purchaseController.purchase
 );
 
-/*
- * ClubKonnect callback
- *
- * POST /api/purchase/clubkonnect/callback
- */
+
+// =====================================================
+// CLUBKONNECT CALLBACK
+// =====================================================
+
 router.post(
   '/clubkonnect/callback',
   purchaseController.clubKonnectCallback
 );
 
-/*
- * Query pending purchase
- *
- * GET  /api/purchase/query
- * POST /api/purchase/query
- */
+
+// =====================================================
+// PURCHASE STATUS / QUERY
+// =====================================================
+
 router.get(
   '/query',
   purchaseController.queryPurchase
@@ -39,14 +39,20 @@ router.post(
   purchaseController.queryPurchase
 );
 
-/*
- * Customer purchase history
- *
- * GET /api/purchase/history?phone=080...
- */
+
+// =====================================================
+// PURCHASE HISTORY
+// =====================================================
+
 router.get(
   '/history',
   purchaseController.history
 );
+
+router.post(
+  '/history',
+  purchaseController.history
+);
+
 
 module.exports = router;
