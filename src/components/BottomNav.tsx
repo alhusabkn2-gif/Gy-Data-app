@@ -8,15 +8,38 @@ import {
   User,
   ShieldCheck,
 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { cn } from '../lib/utils';
 
 const navItems = [
-  { path: '/', label: 'Home', icon: Home },
-  { path: '/services', label: 'Services', icon: Smartphone },
-  { path: '/wallet', label: 'Wallet', icon: Wallet },
-  { path: '/transactions', label: 'History', icon: Receipt },
-  { path: '/profile', label: 'Profile', icon: User },
+  {
+    path: '/',
+    label: 'Home',
+    icon: Home,
+  },
+  {
+    path: '/services',
+    label: 'Services',
+    icon: Smartphone,
+  },
+  {
+    path: '/wallet',
+    label: 'Wallet',
+    icon: Wallet,
+  },
+  {
+    path: '/transactions',
+    label: 'History',
+    icon: Receipt,
+  },
+  {
+    path: '/profile',
+    label: 'Profile',
+    icon: User,
+  },
 ];
 
 const LONG_PRESS_TIME = 2000;
@@ -25,7 +48,10 @@ export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
 
   const startAdminHold = () => {
     if (timerRef.current) {
@@ -34,7 +60,10 @@ export default function BottomNav() {
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      navigate('/super-admin-login', { replace: false });
+
+      navigate('/super-admin-login', {
+        replace: false,
+      });
     }, LONG_PRESS_TIME);
   };
 
@@ -47,66 +76,123 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Normal bottom navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 sm:max-w-md sm:left-1/2 sm:-translate-x-1/2">
+      {/* ------------------------------------------------------------------ */}
+      {/* BOTTOM NAVIGATION                                                  */}
+      {/* ------------------------------------------------------------------ */}
 
-        <div className="border-t border-[#173766] bg-[#07152f] px-2 py-1 pb-[max(0.3rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(7,21,47,0.18)]">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
+        <div className="mx-auto w-full max-w-md px-3 pb-[max(0.45rem,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto overflow-hidden rounded-[25px] border border-white/10 bg-[#071d49]/[0.98] p-1.5 shadow-[0_12px_40px_rgba(7,29,73,0.28)] backdrop-blur-xl">
 
-          <div className="flex items-center justify-around">
+            <div className="flex items-center justify-between gap-1">
+              {navItems.map((item) => {
+                const active =
+                  location.pathname === item.path ||
+                  (item.path !== '/' &&
+                    location.pathname.startsWith(
+                      item.path,
+                    ));
 
-            {navItems.map((item) => {
-              const active =
-                location.pathname === item.path ||
-                (item.path !== '/' &&
-                  location.pathname.startsWith(item.path));
+                const Icon = item.icon;
 
-              const Icon = item.icon;
-
-              return (
-                <button
-                  key={item.path}
-                  type="button"
-                  onClick={() => navigate(item.path)}
-                  className="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors"
-                >
-
-                  {active && (
-                    <motion.div
-                      layoutId="navActive"
-                      className="absolute inset-0 rounded-xl bg-white/10"
-                    />
-                  )}
-
-                  <Icon
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={() =>
+                      navigate(item.path)
+                    }
+                    aria-current={
+                      active
+                        ? 'page'
+                        : undefined
+                    }
                     className={cn(
-                      'relative h-[18px] w-[18px]',
+                      'relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[19px] px-1 py-2 transition-all duration-200',
+                      'active:scale-95',
                       active
                         ? 'text-white'
-                        : 'text-white/45',
-                    )}
-                  />
-
-                  <span
-                    className={cn(
-                      'relative text-[9px] font-medium',
-                      active
-                        ? 'text-white'
-                        : 'text-white/45',
+                        : 'text-white/45 hover:text-white/75',
                     )}
                   >
-                    {item.label}
-                  </span>
+                    {/* ACTIVE BACKGROUND */}
 
-                </button>
-              );
-            })}
+                    {active && (
+                      <motion.div
+                        layoutId="gy-bottom-nav-active"
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 32,
+                        }}
+                        className="absolute inset-0 rounded-[19px] bg-white/[0.13]"
+                      />
+                    )}
 
+                    {/* ACTIVE TOP DOT */}
+
+                    {active && (
+                      <motion.div
+                        layoutId="gy-bottom-nav-dot"
+                        className="absolute -top-0.5 left-1/2 h-1 w-6 -translate-x-1/2 rounded-full bg-white"
+                      />
+                    )}
+
+                    {/* ICON */}
+
+                    <motion.div
+                      animate={
+                        active
+                          ? {
+                              y: -1,
+                              scale: 1.04,
+                            }
+                          : {
+                              y: 0,
+                              scale: 1,
+                            }
+                      }
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 25,
+                      }}
+                      className="relative flex h-7 w-7 items-center justify-center"
+                    >
+                      <Icon
+                        className={cn(
+                          'h-[19px] w-[19px]',
+                          active
+                            ? 'stroke-[2.5]'
+                            : 'stroke-[1.8]',
+                        )}
+                      />
+                    </motion.div>
+
+                    {/* LABEL */}
+
+                    <span
+                      className={cn(
+                        'relative mt-0.5 text-[9px] leading-3',
+                        active
+                          ? 'font-bold text-white'
+                          : 'font-medium text-white/45',
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-
         </div>
       </div>
 
-      {/* Super Admin long-press button */}
+      {/* ------------------------------------------------------------------ */}
+      {/* SUPER ADMIN LONG PRESS                                             */}
+      {/* ------------------------------------------------------------------ */}
+
       <button
         type="button"
         aria-label="Super Admin Login"
@@ -114,14 +200,17 @@ export default function BottomNav() {
         onPointerUp={cancelAdminHold}
         onPointerCancel={cancelAdminHold}
         onPointerLeave={cancelAdminHold}
-        onContextMenu={(event) => event.preventDefault()}
-        className="fixed bottom-24 right-4 z-[99999] flex h-14 w-14 items-center justify-center rounded-full border-2 border-slate-300 bg-white shadow-2xl dark:border-slate-600 dark:bg-slate-900"
+        onContextMenu={(event) =>
+          event.preventDefault()
+        }
+        className="fixed bottom-24 right-4 z-[99999] flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 shadow-[0_8px_25px_rgba(15,23,42,0.15)] backdrop-blur-md transition-transform active:scale-90 dark:border-slate-700 dark:bg-slate-900/95"
         style={{
           touchAction: 'none',
-          WebkitTapHighlightColor: 'transparent',
+          WebkitTapHighlightColor:
+            'transparent',
         }}
       >
-        <ShieldCheck className="h-6 w-6 text-slate-400 dark:text-slate-500" />
+        <ShieldCheck className="h-[19px] w-[19px] text-slate-400 dark:text-slate-500" />
       </button>
     </>
   );
