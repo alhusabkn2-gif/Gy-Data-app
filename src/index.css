@@ -4,47 +4,187 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --gy-navy: #071d49;
+  --gy-navy-2: #0b2a63;
+  --gy-blue: #2563eb;
+  --gy-soft: #f5f8fd;
+  --gy-border: #e5ebf4;
+  --gy-green: #22c55e;
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
   }
-  body {
-    @apply font-sans antialiased bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
-    overscroll-behavior-y: none;
-  }
+
   html {
     scroll-behavior: smooth;
+    background: var(--gy-soft);
   }
+
+  body {
+    @apply font-sans antialiased text-slate-900;
+    background:
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(37, 99, 235, 0.07),
+        transparent 30%
+      ),
+      var(--gy-soft);
+    overscroll-behavior-y: none;
+    min-height: 100vh;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.18);
+  }
+
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
+
   ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+    background: #cbd5e1;
+    border-radius: 999px;
   }
 }
 
 @layer components {
+  .gy-page {
+    @apply mx-auto min-h-screen w-full max-w-md px-4 pb-28;
+  }
+
+  .gy-card {
+    @apply rounded-[26px] border border-slate-100 bg-white shadow-card;
+  }
+
+  .gy-card-soft {
+    @apply rounded-[24px] border border-slate-100 bg-slate-50;
+  }
+
+  .gy-navy-card {
+    @apply relative overflow-hidden rounded-[28px] bg-[#071d49] text-white shadow-xl;
+  }
+
+  .gy-section-title {
+    @apply text-[15px] font-extrabold tracking-tight text-slate-900;
+  }
+
+  .gy-section-subtitle {
+    @apply mt-1 text-xs leading-5 text-slate-400;
+  }
+
+  .gy-icon-box {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl;
+  }
+
+  .gy-input {
+    @apply w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10;
+  }
+
+  .gy-primary-button {
+    @apply flex items-center justify-center gap-2 rounded-2xl bg-[#071d49] px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#071d49]/20 transition-all duration-200 hover:bg-[#0b2a63] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gy-secondary-button {
+    @apply flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-bold text-slate-700 transition-all duration-200 hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gy-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-bold text-blue-700;
+  }
+
   .glass {
-    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800/60;
+    @apply border border-white/20 bg-white/10 backdrop-blur-xl;
   }
+
   .card-premium {
-    @apply bg-white dark:bg-slate-900 rounded-3xl shadow-premium border border-slate-100 dark:border-slate-800;
+    @apply rounded-[26px] border border-slate-100 bg-white shadow-card;
   }
+
   .input-premium {
-    @apply w-full px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+    @apply gy-input;
   }
+
   .btn-primary {
-    @apply px-6 py-3.5 rounded-2xl bg-primary-600 text-white font-semibold shadow-lg shadow-primary-600/25 hover:bg-primary-700 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply gy-primary-button;
   }
+
   .btn-secondary {
-    @apply px-6 py-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98] transition-all duration-200;
+    @apply gy-secondary-button;
   }
+
   .shimmer-bg {
-    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0) 100%);
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.14) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
     background-size: 1000px 100%;
   }
+}
+
+@keyframes gy-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes gy-soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes gy-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.gy-float {
+  animation: gy-float 3.5s ease-in-out infinite;
+}
+
+.gy-soft-pulse {
+  animation: gy-soft-pulse 2.5s ease-in-out infinite;
+}
+
+.gy-pop {
+  animation: gy-pop 0.35s ease-out both;
 }
