@@ -1,177 +1,563 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
-  Receipt as ReceiptIcon, Search, Smartphone, Plus, ArrowDownLeft,
-  Zap, Tv, GraduationCap, BookOpen, Trophy, Wifi, X, Filter,
+  ChevronLeft,
+  Search,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Receipt,
+  Filter,
+  X,
 } from 'lucide-react';
-import PageHeader from '../components/PageHeader';
-import Input from '../components/ui/Input';
-import { AnimatedCard } from '../components/ui/NetworkLogo';
-import { CashbackEarned } from '../components/ui/Cashback';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { formatCurrency, formatDateTime } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 
-const STATUS_TABS = ['all', 'success', 'pending', 'failed'] as const;
-const SERVICES = ['all', 'data', 'airtime', 'electricity', 'cable', 'waec', 'jamb', 'betting', 'smile', 'internet', 'wallet_funding'];
-const DATE_FILTERS = [
-  { id: 'all', label: 'All Time' },
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'This Week' },
-  { id: 'month', label: 'This Month' },
-];
-
-const SERVICE_ICONS: Record<string, typeof Smartphone> = {
-  data: Smartphone, airtime: Smartphone, electricity: Zap, cable: Tv,
-  waec: GraduationCap, jamb: BookOpen, betting: Trophy, smile: Wifi, internet: Wifi,
-  wallet_funding: Plus,
+type Transaction = {
+  id: string;
+  reference?: string;
+  type?: string;
+  service?: string;
+  product?: string;
+  amount: number;
+  status?: string;
+  recipient?: string;
+  network?: string;
+  created_at: string;
 };
+
+const FILTERS = [
+  'All',
+  'Airtime',
+  'Data',
+  'Wallet',
+  'Electricity',
+  'Cable',
+] as const;
+
+type FilterType = (typeof FILTERS)[number];
 
 export default function Transactions() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<any[]>([]);
+
+  const [transactions, setTransactions] =
+    useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [serviceFilter, setServiceFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [filter, setFilter] =
+    useState<FilterType>('All');
+  const [showFilters, setShowFilters] =
+    useState(false);
 
-  useEffect(() => { fetchTransactions(); }, [user]);
+  useEffect(() => {
+    loadTransactions();
+  }, [user?.phone]);
 
-  const fetchTransactions = async () => {
-    if (!user) return;
-    const { data } = await supabase.from('transactions').select('*').eq('phone', user.phone).order('created_at', { ascending: false });
-    setTransactions(data || []);
-    setLoading(false);
+  const loadTransactions = async () => {
+    if (!user?.phone) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('phone', user.phone)
+        .order('created_at', {
+          ascending: false,
+        });
+
+      if (error) {
+        console.error(
+          'Failed to load transactions:',
+          error,
+        );
+        setTransactions([]);
+        return;
+      }
+
+      setTransactions(
+        (data || []) as Transaction[],
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filtered = useMemo(() => {
-    return transactions.filter(tx => {
-      if (statusFilter !== 'all' && tx.status !== statusFilter) return false;
-      if (serviceFilter !== 'all' && tx.service !== serviceFilter) return false;
-      if (dateFilter !== 'all') {
-        const txDate = new Date(tx.created_at);
-        const now = new Date();
-        if (dateFilter === 'today' && txDate.toDateString() !== now.toDateString()) return false;
-        if (dateFilter === 'week') {
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          if (txDate < weekAgo) return false;
-        }
-        if (dateFilter === 'month') {
-          if (txDate.getMonth() !== now.getMonth() || txDate.getFullYear() !== now.getFullYear()) return false;
-        }
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        return tx.product?.toLowerCase().includes(q) || tx.service?.toLowerCase().includes(q) || tx.recipient?.toLowerCase().includes(q) || tx.reference?.toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [transactions, statusFilter, serviceFilter, dateFilter, search]);
+  const filteredTransactions = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase();
 
-  const activeFilters = (statusFilter !== 'all' ? 1 : 0) + (serviceFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0);
+    return transactions.filter((tx) => {
+      const service =
+        tx.service?.toLowerCase() || '';
+
+      const product =
+        tx.product?.toLowerCase() || '';
+
+      const reference =
+        tx.reference?.toLowerCase() || '';
+
+      const recipient =
+        tx.recipient?.toLowerCase() || '';
+
+      let matchesFilter = true;
+
+      if (filter !== 'All') {
+        if (filter === 'Wallet') {
+          matchesFilter =
+            service.includes('wallet') ||
+            tx.type === 'funding' ||
+            tx.type === 'deposit';
+        } else {
+          matchesFilter =
+            service.includes(
+              filter.toLowerCase(),
+            );
+        }
+      }
+
+      const matchesSearch =
+        !query ||
+        service.includes(query) ||
+        product.includes(query) ||
+        reference.includes(query) ||
+        recipient.includes(query) ||
+        tx.network
+          ?.toLowerCase()
+          .includes(query);
+
+      return (
+        matchesFilter && matchesSearch
+      );
+    });
+  }, [
+    transactions,
+    filter,
+    search,
+  ]);
+
+  const getTitle = (tx: Transaction) => {
+    if (tx.product) return tx.product;
+
+    if (tx.service) {
+      return tx.service
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, (char) =>
+          char.toUpperCase(),
+        );
+    }
+
+    return 'Transaction';
+  };
+
+  const isCredit = (tx: Transaction) => {
+    const service =
+      tx.service?.toLowerCase() || '';
+
+    return (
+      tx.type === 'funding' ||
+      tx.type === 'deposit' ||
+      service.includes('wallet') &&
+        !service.includes('purchase')
+    );
+  };
+
+  const getStatusClass = (
+    status?: string,
+  ) => {
+    switch (status?.toLowerCase()) {
+      case 'success':
+      case 'successful':
+        return 'bg-emerald-50 text-emerald-600';
+
+      case 'pending':
+        return 'bg-amber-50 text-amber-600';
+
+      case 'failed':
+      case 'cancelled':
+        return 'bg-red-50 text-red-500';
+
+      default:
+        return 'bg-slate-100 text-slate-500';
+    }
+  };
+
+  const getStatusText = (
+    status?: string,
+  ) => {
+    if (!status) return 'Completed';
+
+    return status
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, (char) =>
+        char.toUpperCase(),
+      );
+  };
+
+  const formatDate = (
+    value: string,
+  ) => {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return date.toLocaleDateString(
+      'en-NG',
+      {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      },
+    );
+  };
+
+  const formatTime = (
+    value: string,
+  ) => {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return date.toLocaleTimeString(
+      'en-NG',
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+      },
+    );
+  };
 
   return (
-    <div className="min-h-screen pb-24 bg-slate-50 dark:bg-slate-950 px-5 pt-12">
-      <PageHeader title="Transactions" subtitle="Your transaction history" back={false} />
+    <div className="min-h-screen bg-[#F6F8FB] pb-24 dark:bg-slate-950">
 
-      {/* Search */}
-      <div className="mb-3">
-        <Input placeholder="Search transactions..." icon={<Search className="w-5 h-5" />} value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
+      {/* HEADER */}
 
-      {/* Status Tabs */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-        {STATUS_TABS.map(f => (
-          <button key={f} onClick={() => setStatusFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize whitespace-nowrap transition-all ${statusFilter === f ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/25' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
-            {f}
+      <div className="bg-[#0D1B3D] px-5 pb-7 pt-10">
+
+        <div className="flex items-center gap-3">
+
+          <button
+            onClick={() => navigate(-1)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 active:scale-95"
+          >
+            <ChevronLeft className="h-5 w-5 text-white" />
           </button>
-        ))}
-        <button onClick={() => setShowFilters(!showFilters)}
-          className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all whitespace-nowrap ${showFilters || activeFilters > 0 ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
-          <Filter className="w-3.5 h-3.5" /> Filters {activeFilters > 0 && <span className="px-1.5 py-0.5 rounded-full bg-primary-600 text-white text-[10px] font-bold">{activeFilters}</span>}
-        </button>
+
+          <div className="flex-1">
+
+            <h1 className="text-xl font-bold text-white">
+              Transactions
+            </h1>
+
+            <p className="mt-0.5 text-xs text-white/60">
+              Your transaction history
+            </p>
+
+          </div>
+
+          <button
+            onClick={() =>
+              setShowFilters(
+                !showFilters,
+              )
+            }
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+              showFilters
+                ? 'bg-[#F28C28]'
+                : 'bg-white/10'
+            }`}
+          >
+            <Filter className="h-4 w-4 text-white" />
+          </button>
+
+        </div>
+
       </div>
 
-      {/* Expandable Filters */}
-      <motion.div initial={false} animate={{ height: showFilters ? 'auto' : 0, opacity: showFilters ? 1 : 0 }} className="overflow-hidden mb-3">
-        <div className="card-premium p-4 space-y-3">
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Service</p>
-            <div className="flex gap-2 flex-wrap">
-              {SERVICES.map(s => (
-                <button key={s} onClick={() => setServiceFilter(s)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${serviceFilter === s ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
-                  {s === 'all' ? 'All Services' : s.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Date</p>
-            <div className="flex gap-2 flex-wrap">
-              {DATE_FILTERS.map(d => (
-                <button key={d.id} onClick={() => setDateFilter(d.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${dateFilter === d.id ? 'bg-primary-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'}`}>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {activeFilters > 0 && (
-            <button onClick={() => { setStatusFilter('all'); setServiceFilter('all'); setDateFilter('all'); }}
-              className="flex items-center gap-1.5 text-xs font-medium text-error-500 hover:text-error-600 transition-colors">
-              <X className="w-3.5 h-3.5" /> Clear all filters
+      <main className="-mt-1 px-5 pt-5">
+
+        {/* SEARCH */}
+
+        <div className="relative">
+
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+          <input
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+            placeholder="Search transactions..."
+            className="w-full rounded-[14px] border border-[#E4E8EF] bg-white py-3.5 pl-11 pr-10 text-sm text-slate-800 outline-none transition focus:border-[#0D1B3D] focus:ring-2 focus:ring-[#0D1B3D]/10 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+          />
+
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+            >
+              <X className="h-4 w-4 text-slate-400" />
             </button>
           )}
-        </div>
-      </motion.div>
 
-      {/* List */}
-      {loading ? (
-        <div className="space-y-2.5">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />)}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="card-premium p-10 text-center">
-          <ReceiptIcon className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-          <p className="text-slate-400 dark:text-slate-500 font-medium">No transactions found</p>
-          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Try adjusting your filters</p>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {filtered.map((tx, i) => {
-            const Icon = SERVICE_ICONS[tx.service] || Smartphone;
-            const isFunding = tx.type === 'funding';
-            const cashback = tx.metadata?.cashback_amount;
-            return (
-              <AnimatedCard key={tx.id} delay={i * 0.03}>
-                <button onClick={() => navigate(`/transactions/${tx.id}`)}
-                  className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all">
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ${isFunding ? 'bg-success-100 dark:bg-success-500/20' : 'bg-primary-100 dark:bg-primary-500/20'}`}>
-                    {isFunding ? <ArrowDownLeft className="w-5 h-5 text-success-600 dark:text-success-400" /> : <Icon className="w-5 h-5 text-primary-600 dark:text-primary-400" />}
-                  </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">{tx.product || tx.service}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{tx.recipient ? `${tx.recipient} · ` : ''}{formatDateTime(tx.created_at)}</p>
-                    {cashback && <div className="mt-1"><CashbackEarned amount={cashback} /></div>}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className={`text-sm font-bold ${isFunding ? 'text-success-600 dark:text-success-400' : 'text-slate-800 dark:text-slate-100'}`}>
-                      {isFunding ? '+' : '-'}{formatCurrency(parseFloat(tx.amount))}
-                    </p>
-                    <p className={`text-xs font-medium capitalize ${tx.status === 'success' ? 'text-success-600 dark:text-success-400' : tx.status === 'failed' ? 'text-error-500' : 'text-warning-500'}`}>{tx.status}</p>
-                  </div>
+
+        {/* FILTERS */}
+
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                height: 0,
+              }}
+              animate={{
+                opacity: 1,
+                height: 'auto',
+              }}
+              exit={{
+                opacity: 0,
+                height: 0,
+              }}
+              className="overflow-hidden"
+            >
+              <div className="flex gap-2 overflow-x-auto py-4">
+
+                {FILTERS.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() =>
+                      setFilter(item)
+                    }
+                    className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-semibold transition ${
+                      filter === item
+                        ? 'bg-[#0D1B3D] text-white'
+                        : 'border border-slate-200 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-900'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!showFilters && (
+          <div className="flex gap-2 overflow-x-auto py-4">
+
+            {FILTERS.slice(0, 4).map(
+              (item) => (
+                <button
+                  key={item}
+                  onClick={() =>
+                    setFilter(item)
+                  }
+                  className={`shrink-0 rounded-full px-4 py-2 text-[11px] font-semibold transition ${
+                    filter === item
+                      ? 'bg-[#0D1B3D] text-white'
+                      : 'border border-slate-200 bg-white text-slate-500 dark:border-slate-800 dark:bg-slate-900'
+                  }`}
+                >
+                  {item}
                 </button>
-              </AnimatedCard>
-            );
-          })}
+              ),
+            )}
+
+          </div>
+        )}
+
+        {/* LIST HEADER */}
+
+        <div className="mb-3 flex items-center justify-between">
+
+          <h2 className="text-sm font-bold text-[#0F172A] dark:text-white">
+            Recent Transactions
+          </h2>
+
+          <span className="text-[10px] text-slate-400">
+            {filteredTransactions.length}{' '}
+            transaction
+            {filteredTransactions.length !==
+            1
+              ? 's'
+              : ''}
+          </span>
+
         </div>
-      )}
+
+        {/* TRANSACTIONS */}
+
+        <div className="space-y-2.5">
+
+          {loading ? (
+            <>
+              {[1, 2, 3, 4].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="h-[78px] animate-pulse rounded-[15px] bg-white dark:bg-slate-900"
+                  />
+                ),
+              )}
+            </>
+          ) : filteredTransactions.length ===
+            0 ? (
+            <div className="rounded-[16px] border border-[#E5E9F0] bg-white px-5 py-12 text-center dark:border-slate-800 dark:bg-slate-900">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#EEF2F8]">
+                <Receipt className="h-5 w-5 text-[#0D1B3D]" />
+              </div>
+
+              <h3 className="mt-4 text-sm font-bold text-slate-800 dark:text-white">
+                No transactions found
+              </h3>
+
+              <p className="mt-1 text-[11px] text-slate-400">
+                Your transactions will appear here.
+              </p>
+
+            </div>
+          ) : (
+            filteredTransactions.map(
+              (tx, index) => {
+                const credit =
+                  isCredit(tx);
+
+                return (
+                  <motion.button
+                    key={
+                      tx.id ||
+                      tx.reference ||
+                      index
+                    }
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay:
+                        index * 0.025,
+                    }}
+                    onClick={() =>
+                      navigate(
+                        `/transactions/${tx.id}`,
+                      )
+                    }
+                    className="flex w-full items-center gap-3 rounded-[15px] border border-[#E5E9F0] bg-white p-3 text-left shadow-sm transition active:scale-[0.99] dark:border-slate-800 dark:bg-slate-900"
+                  >
+
+                    {/* ICON */}
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        credit
+                          ? 'bg-emerald-50'
+                          : 'bg-[#EEF2F8]'
+                      }`}
+                    >
+                      {credit ? (
+                        <ArrowDownLeft className="h-[18px] w-[18px] text-emerald-600" />
+                      ) : (
+                        <ArrowUpRight className="h-[18px] w-[18px] text-[#0D1B3D]" />
+                      )}
+                    </div>
+
+                    {/* DETAILS */}
+
+                    <div className="min-w-0 flex-1">
+
+                      <div className="flex items-center gap-2">
+
+                        <p className="truncate text-xs font-bold text-slate-800 dark:text-white">
+                          {getTitle(tx)}
+                        </p>
+
+                      </div>
+
+                      <p className="mt-1 truncate text-[9px] text-slate-400">
+                        {tx.recipient ||
+                          tx.network ||
+                          tx.reference ||
+                          'Transaction'}
+                      </p>
+
+                      <p className="mt-0.5 text-[9px] text-slate-400">
+                        {formatDate(
+                          tx.created_at,
+                        )}{' '}
+                        •{' '}
+                        {formatTime(
+                          tx.created_at,
+                        )}
+                      </p>
+
+                    </div>
+
+                    {/* AMOUNT */}
+
+                    <div className="shrink-0 text-right">
+
+                      <p
+                        className={`text-sm font-bold ${
+                          credit
+                            ? 'text-emerald-600'
+                            : 'text-[#0D1B3D] dark:text-white'
+                        }`}
+                      >
+                        {credit
+                          ? '+'
+                          : '-'}
+                        {formatCurrency(
+                          Math.abs(
+                            Number(
+                              tx.amount ||
+                                0,
+                            ),
+                          ),
+                        )}
+                      </p>
+
+                      <span
+                        className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[8px] font-semibold ${getStatusClass(
+                          tx.status,
+                        )}`}
+                      >
+                        {getStatusText(
+                          tx.status,
+                        )}
+                      </span>
+
+                    </div>
+
+                  </motion.button>
+                );
+              },
+            )
+          )}
+
+        </div>
+
+      </main>
+
     </div>
   );
 }
