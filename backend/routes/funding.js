@@ -13,7 +13,12 @@ const {
 
 /*
 |--------------------------------------------------------------------------
-| CUSTOMER MANUAL FUNDING
+| CUSTOMER FUNDING
+|--------------------------------------------------------------------------
+|
+| Customer submits a manual funding request.
+|
+| This is the ONLY flow that creates funding_requests.
 |--------------------------------------------------------------------------
 */
 
@@ -25,7 +30,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| SUPER ADMIN FUNDING REQUESTS
+| SUPER ADMIN - LIST FUNDING REQUESTS
 |--------------------------------------------------------------------------
 */
 
@@ -37,7 +42,7 @@ router.get(
 
 /*
 |--------------------------------------------------------------------------
-| SUPER ADMIN APPROVE FUNDING
+| SUPER ADMIN - APPROVE CUSTOMER REQUEST
 |--------------------------------------------------------------------------
 */
 
@@ -49,7 +54,7 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| SUPER ADMIN REJECT FUNDING
+| SUPER ADMIN - REJECT CUSTOMER REQUEST
 |--------------------------------------------------------------------------
 */
 
@@ -61,13 +66,24 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| SUPER ADMIN DIRECT WALLET FUND / REFUND
+| SUPER ADMIN - DIRECT WALLET ADJUSTMENT
 |--------------------------------------------------------------------------
 |
-| type:
-|   fund   = add money to customer wallet
-|   refund = remove money from customer wallet
+| IMPORTANT:
 |
+| This route:
+|
+|   DOES NOT create funding_requests
+|
+| It directly calls:
+|
+|   admin_adjust_wallet()
+|
+| Supported:
+|
+|   type = fund
+|   type = refund
+|--------------------------------------------------------------------------
 */
 
 router.post(
