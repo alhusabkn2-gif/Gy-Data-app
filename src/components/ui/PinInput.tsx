@@ -1,4 +1,9 @@
-import { useRef, useEffect, type KeyboardEvent } from 'react';
+ import {
+  useEffect,
+  useRef,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from 'react';
 import { cn } from '../../lib/utils';
 
 interface PinInputProps {
@@ -8,69 +13,199 @@ interface PinInputProps {
   onComplete?: (value: string) => void;
   error?: boolean;
   autoFocus?: boolean;
+  disabled?: boolean;
 }
 
-export default function PinInput({ length, value, onChange, onComplete, error, autoFocus = true }: PinInputProps) {
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
+export default function PinInput({
+  length,
+  value,
+  onChange,
+  onComplete,
+  error = false,
+  autoFocus = true,
+  disabled = false,
+}: PinInputProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const cleanValue = String(value || '')
+    .replace(/\D/g, '')
+    .slice(0, length);
 
   useEffect(() => {
-    if (autoFocus && refs.current[0]) refs.current[0].focus();
-  }, [autoFocus]);
+    if (
+      autoFocus &&
+      !disabled &&
+      inputRef.current
+    ) {
+      const timer = window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 120);
 
-  const chars = value.split('');
-
-  const handleChange = (i: number, v: string) => {
-    const digit = v.replace(/\D/g, '').slice(-1);
-    const newArr = [...chars];
-    newArr[i] = digit;
-    const newVal = newArr.join('').slice(0, length);
-    onChange(newVal);
-    if (digit && i < length - 1 && refs.current[i + 1]) {
-      refs.current[i + 1]!.focus();
+      return () => window.clearTimeout(timer);
     }
-    if (newVal.length === length && onComplete) onComplete(newVal);
-  };
+  }, [autoFocus, disabled]);
 
-  const handleKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !chars[i] && i > 0 && refs.current[i - 1]) {
-      refs.current[i - 1]!.focus();
+  const focusInput = () => {
+    if (!disabled) {
+      inputRef.current?.focus();
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const nextValue = event.target.value
+      .replace(/\D/g, '')
+      .slice(0, length);
+
+    onChange(nextValue);
+
+    if (
+      nextValue.length === length &&
+      onComplete
+    ) {
+      onComplete(nextValue);
+    }
+  };
+
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+
+      if (
+        cleanValue.length === length &&
+        onComplete
+      ) {
+        onComplete(cleanValue);
+      }
+    }
+  };
+
+  const handlePaste = (
+    event: ClipboardEvent<HTMLInputElement>,
+  ) => {
+    event.preventDefault();
+
+    const pasted = event.clipboardData
+      .getData('text')
+      .replace(/\D/g, '')
+      .slice(0, length);
+
     onChange(pasted);
-    if (pasted.length === length && onComplete) onComplete(pasted);
-    if (refs.current[Math.min(pasted.length, length - 1)]) {
-      refs.current[Math.min(pasted.length, length - 1)]!.focus();
+
+    if (
+      pasted.length === length &&
+      onComplete
+    ) {
+      onComplete(pasted);
     }
+
+    focusInput();
   };
 
   return (
-    <div className="flex justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
-      {Array.from({ length }).map((_, i) => (
-        <input
-          key={i}
-          ref={(el) => { refs.current[i] = el; }}
-          type="tel"
-          inputMode="numeric"
-          maxLength={1}
-          value={chars[i] || ''}
-          onChange={(e) => handleChange(i, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          onFocus={(e) => e.target.select()}
-          className={cn(
-            'w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold rounded-2xl border-2 transition-all duration-200 focus:outline-none',
-            error
-              ? 'border-error-300 dark:border-error-500/50 bg-error-50 dark:bg-error-500/10'
-              : chars[i]
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
-              : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-slate-100',
-            'focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
-          )}
-        />
-      ))}
+    <div
+      className="relative w-full"
+      onClick={focusInput}
+    >
+      {/* REAL KEYBOARD INPUT */}
+      <input
+        ref={inputRef}
+        type="tel"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        enterKeyHint="done"
+        value={cleanValue}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        disabled={disabled}
+        maxLength={length}
+        aria-label="PIN"
+        className="
+          absolute
+          inset-0
+          z-20
+          h-full
+          w-full
+          cursor-text
+          opacity-0
+        "
+      />
+
+      {/* VISUAL PIN BOXES */}
+      <div
+        className="
+          relative
+          z-10
+          flex
+          w-full
+          justify-center
+          gap-2
+          sm:gap-3
+          pointer-events-none
+        "
+      >
+        {Array.from({ length }).map((_, index) => {
+          const digit =
+            cleanValue[index] || '';
+
+          const isCurrent =
+            cleanValue.length === index &&
+            cleanValue.length < length;
+
+          return (
+            <div
+              key={index}
+              className={cn(
+                `
+                  flex
+                  h-14
+                  w-12
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  border-2
+                  text-2xl
+                  font-black
+                  transition-all
+                  duration-200
+                  sm:h-16
+                  sm:w-14
+                `,
+                error
+                  ? `
+                    border-red-400
+                    bg-red-50
+                    text-red-700
+                  `
+                  : digit
+                  ? `
+                    border-blue-600
+                    bg-blue-50
+                    text-blue-700
+                    shadow-sm
+                  `
+                  : isCurrent
+                  ? `
+                    border-blue-500
+                    bg-white
+                    shadow-[0_0_0_3px_rgba(37,99,235,0.10)]
+                  `
+                  : `
+                    border-slate-200
+                    bg-slate-50
+                    text-slate-900
+                  `,
+              )}
+            >
+              {digit || ''}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
